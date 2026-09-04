@@ -7,7 +7,6 @@ local config = require "dbtpal.config"
 local commands = require "dbtpal.commands"
 local projects = require "dbtpal.projects"
 local log = require "dbtpal.log"
-local J = require "plenary.job"
 local display = require "dbtpal.display"
 
 local M = {}
@@ -53,14 +52,11 @@ M.dbt_picker = function(opts)
     end
 
     local dbt_path, cmd_args = commands.build_path_args(cmd, args)
-    local response = {}
-    J
-        :new({
-            command = dbt_path,
-            args = cmd_args,
-            on_exit = function(j, code)
+    vim.system(vim.list_extend({ dbt_path }, cmd_args), { text = true }, function(result)
+                local response = vim.split(result.stdout or "", "\n", { plain = true, trimempty = true })
+                local stderr = vim.split(result.stderr or "", "\n", { plain = true, trimempty = true })
+                local code = result.code
                 if code == 0 then
-                    response = j:result()
                     log.trace(response)
                     vim.schedule(function() M.dbt_models(response, opts) end)
                 else
@@ -69,13 +65,10 @@ M.dbt_picker = function(opts)
                     local err = string.format("dbt command failed: %s %s\n\n", dbt_path, a)
                     table.insert(response, "------------\n")
                     table.insert(response, err)
-                    vim.list_extend(response, j:stderr_result())
-                    vim.list_extend(response, j:result())
+                    vim.list_extend(response, stderr)
                     vim.schedule(function() display.popup(response) end)
                 end
-            end,
-        })
-        :start()
+    end)
 end
 
 return M

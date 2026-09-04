@@ -2,7 +2,6 @@ local config = require "dbtpal.config"
 local projects = require "dbtpal.projects"
 local commands = require "dbtpal.commands"
 local log = require "dbtpal.log"
-local J = require "plenary.job"
 local display = require "dbtpal.display"
 
 local M = {}
@@ -65,13 +64,11 @@ M._create_job = function(cmd, args)
     local onexit = function(data) display.popup(data) end
     if args == "" then args = nil end
     local dbt_path, cmd_args = commands.build_path_args(cmd, args)
-    local response = {}
-    local job = J:new {
-        command = dbt_path,
-        args = cmd_args,
-        on_exit = function(j, code)
+    local job = vim.system(vim.list_extend({ dbt_path }, cmd_args), { text = true }, function(result)
+            local response = vim.split(result.stdout or "", "\n", { plain = true, trimempty = true })
+            local stderr = vim.split(result.stderr or "", "\n", { plain = true, trimempty = true })
+            local code = result.code
             if code == 1 then
-                vim.list_extend(response, j:result())
                 log.warn "dbt command encounted a handled error, see popup for details"
             elseif code >= 2 then
                 table.insert(response, "Failed to run dbt command. Exit Code: " .. code .. "\n")
@@ -79,16 +76,10 @@ M._create_job = function(cmd, args)
                 local err = string.format("dbt command failed: %s %s\n\n", dbt_path, a)
                 table.insert(response, "------------\n")
                 table.insert(response, err)
-                log.debug(j)
-                vim.list_extend(response, j:result())
-                vim.list_extend(response, j:stderr_result())
-            else
-                response = j:result()
+                vim.list_extend(response, stderr)
             end
             vim.schedule(function() onexit(response) end)
-        end,
-    }
-    job:start()
+    end)
     return job
 end
 
