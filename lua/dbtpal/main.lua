@@ -65,20 +65,20 @@ M._create_job = function(cmd, args)
     if args == "" then args = nil end
     local dbt_path, cmd_args = commands.build_path_args(cmd, args)
     local job = vim.system(vim.list_extend({ dbt_path }, cmd_args), { text = true }, function(result)
-            local response = vim.split(result.stdout or "", "\n", { plain = true, trimempty = true })
-            local stderr = vim.split(result.stderr or "", "\n", { plain = true, trimempty = true })
-            local code = result.code
-            if code == 1 then
-                log.warn "dbt command encounted a handled error, see popup for details"
-            elseif code >= 2 then
-                table.insert(response, "Failed to run dbt command. Exit Code: " .. code .. "\n")
-                local a = table.concat(cmd_args, " ") or ""
-                local err = string.format("dbt command failed: %s %s\n\n", dbt_path, a)
-                table.insert(response, "------------\n")
-                table.insert(response, err)
-                vim.list_extend(response, stderr)
-            end
-            vim.schedule(function() onexit(response) end)
+        local response = vim.split(result.stdout or "", "\n", { plain = true, trimempty = true })
+        local stderr = vim.split(result.stderr or "", "\n", { plain = true, trimempty = true })
+        local code = result.code
+        if code == 1 then
+            log.warn "dbt command encounted a handled error, see popup for details"
+        elseif code >= 2 then
+            table.insert(response, "Failed to run dbt command. Exit Code: " .. code .. "\n")
+            local a = table.concat(cmd_args, " ") or ""
+            local err = string.format("dbt command failed: %s %s\n\n", dbt_path, a)
+            table.insert(response, "------------\n")
+            table.insert(response, err)
+            vim.list_extend(response, stderr)
+        end
+        vim.schedule(function() onexit(response) end)
     end)
     return job
 end

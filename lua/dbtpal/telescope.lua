@@ -53,21 +53,21 @@ M.dbt_picker = function(opts)
 
     local dbt_path, cmd_args = commands.build_path_args(cmd, args)
     vim.system(vim.list_extend({ dbt_path }, cmd_args), { text = true }, function(result)
-                local response = vim.split(result.stdout or "", "\n", { plain = true, trimempty = true })
-                local stderr = vim.split(result.stderr or "", "\n", { plain = true, trimempty = true })
-                local code = result.code
-                if code == 0 then
-                    log.trace(response)
-                    vim.schedule(function() M.dbt_models(response, opts) end)
-                else
-                    table.insert(response, "Failed to run dbt command. Exit Code: " .. code .. "\n")
-                    local a = table.concat(cmd_args, " ") or ""
-                    local err = string.format("dbt command failed: %s %s\n\n", dbt_path, a)
-                    table.insert(response, "------------\n")
-                    table.insert(response, err)
-                    vim.list_extend(response, stderr)
-                    vim.schedule(function() display.popup(response) end)
-                end
+        local response = vim.split(result.stdout or "", "\n", { plain = true, trimempty = true })
+        local stderr = vim.split(result.stderr or "", "\n", { plain = true, trimempty = true })
+        local code = result.code
+        if code == 0 then
+            log.trace(response)
+            vim.schedule(function() M.dbt_models(response, opts) end)
+        else
+            table.insert(response, "Failed to run dbt command. Exit Code: " .. code .. "\n")
+            local a = table.concat(cmd_args, " ") or ""
+            local err = string.format("dbt command failed: %s %s\n\n", dbt_path, a)
+            table.insert(response, "------------\n")
+            table.insert(response, err)
+            vim.list_extend(response, stderr)
+            vim.schedule(function() display.popup(response) end)
+        end
     end)
 end
 
