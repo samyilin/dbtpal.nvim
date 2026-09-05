@@ -69,6 +69,7 @@ M.compile_float = function()
         end
     end
 
+    log.info "dbt compile started"
     vim.system(vim.list_extend({ dbt_path }, cmd_args), { text = true }, function(result)
         if result.code ~= 0 then
             vim.schedule(function()
@@ -81,6 +82,7 @@ M.compile_float = function()
         end
 
         vim.schedule(function()
+            log.info "dbt compile completed"
             local matches = vim.fs.find(
                 function(name) return name == source_name and name:match "%.sql$" ~= nil end,
                 { path = vim.fs.joinpath(target, "compiled"), type = "file", limit = 1 }
@@ -127,7 +129,7 @@ M.build = function(selector, args) return _build(selector, args) end
 M.run_command = function(cmd, args) return _cmd_select_args(cmd, nil, args) end
 
 M._create_job = function(cmd, args)
-    log.info("dbt " .. cmd .. " queued")
+    log.info("dbt " .. cmd .. " started")
     if config.options.path_to_dbt_project == "" then
         local bpath = vim.fn.expand "%:p:h"
         if projects.detect_dbt_project_dir(bpath) == false then
@@ -156,6 +158,7 @@ M._create_job = function(cmd, args)
             table.insert(response, err)
             vim.list_extend(response, stderr)
         end
+        if code == 0 then log.info("dbt " .. cmd .. " completed") end
         vim.schedule(function() onexit(response) end)
     end)
     return job
