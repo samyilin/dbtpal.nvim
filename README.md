@@ -188,11 +188,18 @@ In Lua: `require('dbtpal').compile()`
 
 Compile the current model
 
+`DbtCompileAll` compiles the project, and `DbtCompileModel <selector>` compiles
+an explicit selector. `DbtCompileFloat` displays the current model's compiled
+SQL in a temporary read-only floating buffer.
+
 #### DbtBuild
 
 In Lua: `require('dbtpal').build()`
 
 Build the current model
+
+`DbtBuildAll` builds the project, while `DbtBuildModel` builds the current
+model. `DbtDebugAll` runs the project-wide `dbt debug` command.
 
 
 ### Additional Lua Only Functions
