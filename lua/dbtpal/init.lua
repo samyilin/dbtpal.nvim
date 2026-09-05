@@ -44,6 +44,7 @@ vim.api.nvim_create_user_command("DbtCompile", function() main.compile() end, { 
 vim.api.nvim_create_user_command("DbtCompileFloat", function() main.compile_float() end, { nargs = 0 })
 
 vim.api.nvim_create_user_command("DbtBuild", function() main.build() end, { nargs = 0 })
+vim.api.nvim_create_user_command("DbtBuildModel", function() main.build(vim.fn.expand "%:t:r") end, { nargs = 0 })
 
 local ok, _ = pcall(require, "telescope")
 if ok then M.dbt_picker = require("dbtpal.telescope").dbt_picker end
