@@ -22,8 +22,10 @@ M.build_path_args = function(cmd, args)
     local cmd_args = {}
 
     -- TODO: make this configurable
-    local pre_cmd_args = config.options.pre_cmd_args or {}
-    local post_cmd_args = config.options.post_cmd_args or {}
+    -- Copy configured arguments before adding generated options. Mutating the
+    -- config here duplicates --profiles-dir/--project-dir on every command.
+    local pre_cmd_args = vim.deepcopy(config.options.pre_cmd_args or {})
+    local post_cmd_args = vim.deepcopy(config.options.post_cmd_args or {})
 
     if include_profiles_dir and dbt_profile ~= "v:null" then
         table.insert(post_cmd_args, "--profiles-dir")
