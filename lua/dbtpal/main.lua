@@ -44,6 +44,82 @@ M.test = function() return _test(vim.fn.expand "%:t:r") end
 
 M.compile = function(selector, args) return _compile(selector, args) end
 
+M.compile_float = function()
+    local target = vim.fs.joinpath(
+        vim.fn.stdpath "cache",
+        "dbtpal",
+        tostring(vim.fn.localtime()) .. "-" .. tostring(vim.fn.getpid())
+    )
+    vim.fn.mkdir(target, "p")
+    local dbt_path, cmd_args = commands.build_path_args("compile", {
+        "--select",
+        vim.fn.expand "%:t:r",
+        "--target-path",
+        target,
+    })
+
+    if config.options.path_to_dbt_project == "" then
+        local bpath = vim.fn.expand "%:p:h"
+        if projects.detect_dbt_project_dir(bpath) == false then
+            vim.fn.delete(target, "rf")
+            log.warn "Could not detect dbt project dir"
+            return
+        end
+    end
+
+    vim.system(vim.list_extend({ dbt_path }, cmd_args), { text = true }, function(result)
+        if result.code ~= 0 then
+            vim.fn.delete(target, "rf")
+            vim.schedule(
+                function()
+                    display.popup(
+                        vim.split((result.stdout or "") .. "\n" .. (result.stderr or ""), "\n", { trimempty = true })
+                    )
+                end
+            )
+            return
+        end
+
+        local matches = vim.fs.find(
+            function(name) return name == vim.fn.expand "%:t" and name:match "%.sql$" ~= nil end,
+            { path = vim.fs.joinpath(target, "compiled"), type = "file", limit = 1 }
+        )
+        if #matches == 0 then
+            vim.fn.delete(target, "rf")
+            vim.schedule(function() display.popup { "dbt compiled successfully, but no SQL output was found" } end)
+            return
+        end
+
+        local bufnr = vim.api.nvim_create_buf(false, true)
+        vim.bo[bufnr].buftype = "nofile"
+        vim.bo[bufnr].bufhidden = "wipe"
+        vim.bo[bufnr].swapfile = false
+        vim.bo[bufnr].filetype = "sql"
+        vim.api.nvim_buf_set_name(bufnr, "[dbt compiled] " .. vim.fn.expand "%:t")
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, vim.fn.readfile(matches[1]))
+        vim.bo[bufnr].modifiable = false
+
+        local width = math.floor(vim.o.columns * 0.8)
+        local height = math.floor(vim.o.lines * 0.8)
+        local winid = vim.api.nvim_open_win(bufnr, true, {
+            relative = "editor",
+            width = width,
+            height = height,
+            row = math.floor((vim.o.lines - height) / 2),
+            col = math.floor((vim.o.columns - width) / 2),
+            style = "minimal",
+            border = "rounded",
+        })
+        vim.api.nvim_create_autocmd("BufWipeout", {
+            buffer = bufnr,
+            once = true,
+            callback = function() vim.fn.delete(target, "rf") end,
+        })
+        vim.keymap.set("n", "q", "<cmd>close<cr>", { buffer = bufnr, silent = true })
+        vim.api.nvim_win_set_option(winid, "winhl", "Normal:Normal")
+    end)
+end
+
 M.build = function(selector, args) return _build(selector, args) end
 
 M.run_command = function(cmd, args) return _cmd_select_args(cmd, nil, args) end

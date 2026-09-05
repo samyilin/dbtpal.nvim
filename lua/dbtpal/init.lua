@@ -21,6 +21,7 @@ M.test_all = main.test_all
 M.test_model = main.test_model
 
 M.compile = main.compile
+M.compile_float = main.compile_float
 M.build = main.build
 
 M.run_command = main.run_command
@@ -40,6 +41,7 @@ vim.api.nvim_create_user_command("DbtTestAll", function(cmd) main.test_all(cmd.a
 vim.api.nvim_create_user_command("DbtTestModel", function(cmd) main.test_model(cmd.args) end, { nargs = 1 })
 
 vim.api.nvim_create_user_command("DbtCompile", function() main.compile() end, { nargs = 0 })
+vim.api.nvim_create_user_command("DbtCompileFloat", function() main.compile_float() end, { nargs = 0 })
 
 vim.api.nvim_create_user_command("DbtBuild", function() main.build() end, { nargs = 0 })
 
