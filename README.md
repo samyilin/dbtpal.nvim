@@ -163,6 +163,18 @@ only renders SQL. The default picker uses `vim.ui.select()` and has no preview
 pane. Telescope or mini.pick adapters can be added later without changing the
 dbt discovery API.
 
+Graph selection commands are also available:
+
+```vim
+:DbtSelectUpstream
+:DbtSelectDownstream
+:DbtSelectFamily
+```
+
+These query dbt for related models, then let you open, run, test, compile,
+build, or refresh the selection. `mini.pick` is supported as an optional
+single-selection backend when installed.
+
 
 Your typical dbt commands are supported in three modes: current model, all models,
 and user-specified models. See the sample setup above for some common mappings.

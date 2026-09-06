@@ -10,6 +10,7 @@ local resources = require "dbtpal.resources"
 local picker = require "dbtpal.picker"
 local workflows = require "dbtpal.workflows"
 local telescope_picker = require "dbtpal.picker_telescope"
+local mini_picker = require "dbtpal.picker_mini"
 
 local M = {}
 
@@ -37,7 +38,11 @@ M.execute = execute.run
 M.list_resources = resources.list
 M.picker = picker
 M.select_models = workflows.select_models
+M.select_upstream = workflows.select_upstream
+M.select_downstream = workflows.select_downstream
+M.select_family = workflows.select_family
 telescope_picker.setup(picker)
+mini_picker.setup(picker)
 
 M.run = main.run
 M.run_all = main.run_all
@@ -100,6 +105,9 @@ end, { nargs = "*" })
 vim.api.nvim_create_user_command("DbtBuildAll", function(cmd) main.build(nil, cmd.fargs) end, { nargs = "*" })
 vim.api.nvim_create_user_command("DbtDebugAll", function(cmd) main.run_command("debug", cmd.fargs) end, { nargs = "*" })
 vim.api.nvim_create_user_command("DbtSelectModels", function() workflows.select_models() end, { nargs = 0 })
+vim.api.nvim_create_user_command("DbtSelectUpstream", function() workflows.select_upstream() end, { nargs = 0 })
+vim.api.nvim_create_user_command("DbtSelectDownstream", function() workflows.select_downstream() end, { nargs = 0 })
+vim.api.nvim_create_user_command("DbtSelectFamily", function() workflows.select_family() end, { nargs = 0 })
 
 local ok, _ = pcall(require, "telescope")
 if ok then M.dbt_picker = require("dbtpal.telescope").dbt_picker end

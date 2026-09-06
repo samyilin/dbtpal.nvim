@@ -53,7 +53,10 @@ end
 
 function M.select(opts, callback) return M.get(opts and opts.backend).select(opts or {}, callback) end
 
-function M.select_many(opts, callback) return M.get(opts and opts.backend).select_many(opts or {}, callback) end
+function M.select_many(opts, callback)
+    local backend = M.get(opts and opts.backend)
+    return (backend.select_many or builtin_select_many)(opts or {}, callback)
+end
 
 M.register("builtin", { select = builtin_select, select_many = builtin_select_many })
 M.register("default", M.backends.builtin)
