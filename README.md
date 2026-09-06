@@ -27,7 +27,25 @@ on Twitter ([@pdrmnvd](https://twitter.com/pdrmnvd)) or by creating an issue.
 
 - Neovim >=0.5.0
 - [dbt](https://docs.getdbt.com/dbt-cli/installation) >=1.0.0
-- [plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
+- Neovim 0.12+ for the fork's native process execution
+
+### dbt Fusion compatibility
+
+The fork invokes the configured `dbt` executable through Neovim's native
+`vim.system()` API and does not call Python dbt APIs. Basic commands should
+therefore work with dbt Fusion when the same commands work in a shell:
+
+```sh
+dbt --version
+dbt compile
+dbt build
+```
+
+Fusion compatibility is not guaranteed for every project. Adapter support,
+Python models, package constraints, CLI flags, artifact formats, and
+`dbt ls`-based picker behavior may differ between Python dbt and Fusion. The
+configured `path_to_dbt` must point to the intended executable. Fusion's richer
+language-server and SQL-comprehension features are not consumed by dbtpal yet.
 
 ## ⚙ Installation
 
