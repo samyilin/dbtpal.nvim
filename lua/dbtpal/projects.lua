@@ -5,6 +5,7 @@ local M = {}
 
 local _find_project_dir = function(fpath)
     if fpath == nil then fpath = vim.fn.expand "%:p:h" end
+    if fpath:match "^oil://" then fpath = vim.uri_to_fname(fpath) end
     log.debug("Searching for dbt project dir in " .. fpath)
     local path = vim.fn.expand(vim.fn.fnamemodify(fpath, ":p"))
     local dbt_project = vim.fn.findfile("dbt_project.yml", path .. ";")

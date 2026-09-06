@@ -40,11 +40,13 @@ vim.api.nvim_create_user_command("DbtTestAll", function(cmd) main.test_all(cmd.a
 
 vim.api.nvim_create_user_command("DbtTestModel", function(cmd) main.test_model(cmd.args) end, { nargs = 1 })
 
-vim.api.nvim_create_user_command(
-    "DbtCompile",
-    function(cmd) main.compile(vim.fn.expand "%:t:r", cmd.args) end,
-    { nargs = "?" }
-)
+vim.api.nvim_create_user_command("DbtCompile", function(cmd)
+    if vim.bo.buftype ~= "" or (vim.bo.filetype ~= "dbt" and vim.bo.filetype ~= "sql") then
+        vim.notify("DbtCompile requires a dbt model buffer; use :DbtCompileAll for the project", vim.log.levels.WARN)
+        return
+    end
+    main.compile(vim.fn.expand "%:t:r", cmd.args)
+end, { nargs = "?" })
 vim.api.nvim_create_user_command("DbtCompileAll", function(cmd) main.compile(nil, cmd.args) end, { nargs = "?" })
 vim.api.nvim_create_user_command("DbtCompileModel", function(cmd) main.compile(cmd.args) end, { nargs = 1 })
 vim.api.nvim_create_user_command("DbtCompileFloat", function() main.compile_float() end, { nargs = 0 })
