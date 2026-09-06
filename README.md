@@ -150,6 +150,19 @@ use {
 dbtpal has sensible defaults and can auto-detect project directories based
 on the currently open buffer when first run.
 
+### `DbtSelectModels`
+
+`DbtSelectModels` opens a dependency-free model picker, lets you select one or
+more models, and then asks whether to `run`, `test`, `compile`, or `build` the
+selection. It next asks whether to show notifications only or open the complete
+dbt output in the existing popup.
+
+The selected models are passed to dbt as one `--select` argument. `run` and
+`build` can modify the database; `test` tests existing relations; `compile`
+only renders SQL. The default picker uses `vim.ui.select()` and has no preview
+pane. Telescope or mini.pick adapters can be added later without changing the
+dbt discovery API.
+
 
 Your typical dbt commands are supported in three modes: current model, all models,
 and user-specified models. See the sample setup above for some common mappings.
