@@ -192,6 +192,24 @@ Compile the current model
 an explicit selector. `DbtCompileFloat` displays the current model's compiled
 SQL in a temporary read-only floating buffer.
 
+The current-model and `All` commands accept optional dbt arguments, for example:
+
+```vim
+:DbtCompile --target prod
+:DbtCompileAll --full-refresh
+:DbtBuild --vars '{"use_new_logic": true}'
+```
+
+For arbitrary argument combinations, use the Lua API:
+
+```vim
+:lua require('dbtpal').run_command('compile', {'--target', 'prod', '--select', 'orders'})
+```
+
+String command arguments are split on spaces, so quoted JSON and other values
+containing spaces are not reliable through the command interface. Use a Lua
+argument table for those cases.
+
 #### DbtBuild
 
 In Lua: `require('dbtpal').build()`

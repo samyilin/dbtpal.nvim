@@ -30,7 +30,7 @@ M.run_all = function(args) return _run(nil, args) end
 
 M.run_model = function(selector, args) return _run(selector, args) end
 
-M.run = function() return _run(vim.fn.expand "%:t:r") end
+M.run = function(args) return _run(vim.fn.expand "%:t:r", args) end
 
 M.run_children = function() return _run(vim.fn.expand "%:t:r" .. "+") end
 M.run_parents = function() return _run("+" .. vim.fn.expand "%:t:r") end
@@ -40,7 +40,7 @@ M.test_all = function(args) return _test(nil, args) end
 
 M.test_model = function(selector, args) return _test(selector, args) end
 
-M.test = function() return _test(vim.fn.expand "%:t:r") end
+M.test = function(args) return _test(vim.fn.expand "%:t:r", args) end
 
 M.compile = function(selector, args) return _compile(selector, args) end
 
