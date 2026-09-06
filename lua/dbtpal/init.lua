@@ -3,6 +3,8 @@ define here the lua functions that activate the plugin ]]
 
 local main = require "dbtpal.main"
 local config = require "dbtpal.config"
+local context = require "dbtpal.context"
+local selectors = require "dbtpal.selectors"
 
 local M = {}
 
@@ -24,6 +26,8 @@ end
 
 M.config = config
 M.setup = config.setup
+M.context = context
+M.selectors = selectors
 
 M.run = main.run
 M.run_all = main.run_all
