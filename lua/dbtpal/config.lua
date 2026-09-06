@@ -13,6 +13,7 @@ M.defaults = {
     custom_dbt_syntax_enabled = true,
     extended_path_search = true,
     protect_compiled_files = true,
+    picker_backend = "default",
 
     pre_cmd_args = {},
     post_cmd_args = {},

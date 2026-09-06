@@ -1,4 +1,5 @@
 local M = { backends = {} }
+local config = require "dbtpal.config"
 
 local function builtin_select(opts, callback)
     vim.ui.select(opts.items or {}, {
@@ -44,6 +45,7 @@ end
 function M.register(name, backend) M.backends[name] = backend end
 
 function M.get(name)
+    name = name or config.options.picker_backend
     if name and M.backends[name] then return M.backends[name] end
     if M.backends.default then return M.backends.default end
     return { select = builtin_select, select_many = builtin_select_many }

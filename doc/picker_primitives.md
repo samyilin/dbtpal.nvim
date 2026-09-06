@@ -88,6 +88,10 @@ supports single selection directly and multi-selection by repeatedly choosing
 resources until `Done` is selected. Telescope and mini.pick can be added as
 adapters without changing the resource or execution APIs.
 
+Select the backend with `picker_backend` in dbtpal configuration. It defaults
+to `default` (the dependency-free `vim.ui.select()` backend); set it to
+`telescope` only when Telescope is installed.
+
 The first workflow is exposed as `:DbtSelectModels`: select one or more models,
 choose `run`, `test`, `compile`, or `build`, and execute the operation with a
 combined `--select` argument.
