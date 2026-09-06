@@ -83,6 +83,11 @@ picker.select_many(opts, callback)
 
 The first feature will use multi-model selection followed by a dbt operation.
 
+The initial backend is a dependency-free `vim.ui.select` implementation. It
+supports single selection directly and multi-selection by repeatedly choosing
+resources until `Done` is selected. Telescope and mini.pick can be added as
+adapters without changing the resource or execution APIs.
+
 ## Python dbt and Fusion compatibility
 
 The shared compatibility surface is the CLI:

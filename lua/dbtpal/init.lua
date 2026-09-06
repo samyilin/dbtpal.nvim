@@ -7,6 +7,7 @@ local context = require "dbtpal.context"
 local selectors = require "dbtpal.selectors"
 local execute = require "dbtpal.execute"
 local resources = require "dbtpal.resources"
+local picker = require "dbtpal.picker"
 
 local M = {}
 
@@ -32,6 +33,7 @@ M.context = context
 M.selectors = selectors
 M.execute = execute.run
 M.list_resources = resources.list
+M.picker = picker
 
 M.run = main.run
 M.run_all = main.run_all
