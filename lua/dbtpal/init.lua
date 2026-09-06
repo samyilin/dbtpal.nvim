@@ -5,6 +5,8 @@ local main = require "dbtpal.main"
 local config = require "dbtpal.config"
 local context = require "dbtpal.context"
 local selectors = require "dbtpal.selectors"
+local execute = require "dbtpal.execute"
+local resources = require "dbtpal.resources"
 
 local M = {}
 
@@ -28,6 +30,8 @@ M.config = config
 M.setup = config.setup
 M.context = context
 M.selectors = selectors
+M.execute = execute.run
+M.list_resources = resources.list
 
 M.run = main.run
 M.run_all = main.run_all
