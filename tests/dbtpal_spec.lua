@@ -119,4 +119,34 @@ describe("dbtpal", function()
         local expect = vim.fn.getcwd() .. "/tests/dbt_project"
         assert.are.equal(require("dbtpal.config").options.path_to_dbt_project, expect)
     end)
+
+    it("builds graph selectors", function()
+        local selectors = require "dbtpal.selectors"
+        assert.are.equal("+orders", selectors.upstream "orders")
+        assert.are.equal("orders+", selectors.downstream "orders")
+        assert.are.equal("+orders+", selectors.family "orders")
+        assert.are.equal("tag:daily", selectors.tag "daily")
+        assert.are.equal("path:models/staging", selectors.path "models/staging")
+    end)
+
+    it("normalizes dbt resources", function()
+        local resource = require("dbtpal.resources").normalize {
+            unique_id = "model.project.orders",
+            name = "orders",
+            resource_type = "model",
+            original_file_path = "models/orders.sql",
+            package_name = "project",
+        }
+        assert.are.equal("model.project.orders", resource.unique_id)
+        assert.are.equal("models/orders.sql", resource.path)
+        assert.are.equal("model", resource.resource_type)
+    end)
+
+    it("does not duplicate generated project arguments", function()
+        local commands = require "dbtpal.commands"
+        local _, args = commands.build_path_args("compile", {})
+        local joined = table.concat(args, " ")
+        assert.are.equal(1, select(2, joined:gsub("%-%-profiles%-dir", "")))
+        assert.are.equal(1, select(2, joined:gsub("%-%-project%-dir", "")))
+    end)
 end)

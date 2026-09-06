@@ -2,7 +2,8 @@ local execute = require "dbtpal.execute"
 
 local M = {}
 
-local function normalize(row)
+function M.normalize(row)
+    if type(row) ~= "table" then return nil end
     return {
         unique_id = row.unique_id,
         name = row.name,
@@ -30,7 +31,12 @@ function M.list(opts, callback)
                 callback(nil, { code = 1, stderr = "invalid JSON from dbt ls" })
                 return
             end
-            resources[#resources + 1] = normalize(row)
+            local resource = M.normalize(row)
+            if not resource then
+                callback(nil, { code = 1, stderr = "invalid resource from dbt ls" })
+                return
+            end
+            resources[#resources + 1] = resource
         end
         callback(resources, nil)
     end)
