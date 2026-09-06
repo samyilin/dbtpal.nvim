@@ -9,6 +9,7 @@ local execute = require "dbtpal.execute"
 local resources = require "dbtpal.resources"
 local picker = require "dbtpal.picker"
 local workflows = require "dbtpal.workflows"
+local telescope_picker = require "dbtpal.picker_telescope"
 
 local M = {}
 
@@ -36,6 +37,7 @@ M.execute = execute.run
 M.list_resources = resources.list
 M.picker = picker
 M.select_models = workflows.select_models
+telescope_picker.setup(picker)
 
 M.run = main.run
 M.run_all = main.run_all
