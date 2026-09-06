@@ -88,6 +88,10 @@ supports single selection directly and multi-selection by repeatedly choosing
 resources until `Done` is selected. Telescope and mini.pick can be added as
 adapters without changing the resource or execution APIs.
 
+The first workflow is exposed as `:DbtSelectModels`: select one or more models,
+choose `run`, `test`, `compile`, or `build`, and execute the operation with a
+combined `--select` argument.
+
 ## Python dbt and Fusion compatibility
 
 The shared compatibility surface is the CLI:
