@@ -91,6 +91,8 @@ adapters without changing the resource or execution APIs.
 The first workflow is exposed as `:DbtSelectModels`: select one or more models,
 choose `run`, `test`, `compile`, or `build`, and execute the operation with a
 combined `--select` argument.
+After choosing an operation, the workflow offers `Notify only` or `Open full
+output`; the latter opens dbt's complete stdout in the existing popup.
 
 ## Python dbt and Fusion compatibility
 

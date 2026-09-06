@@ -3,6 +3,7 @@ local resources = require "dbtpal.resources"
 local selectors = require "dbtpal.selectors"
 local picker = require "dbtpal.picker"
 local log = require "dbtpal.log"
+local display = require "dbtpal.display"
 
 local M = {}
 
@@ -19,10 +20,21 @@ function M.select_models()
                 { prompt = "Select dbt operation" },
                 function(operation)
                     if not operation then return end
-                    local selected_ids = selectors.from_resources(selected)
-                    execute.run(operation, { "--select", table.concat(selected_ids, " ") }, function(result)
-                        if result.code ~= 0 then log.error(result.stderr ~= "" and result.stderr or result.stdout) end
-                    end)
+                    vim.ui.select(
+                        { "Notify only", "Open full output" },
+                        { prompt = "Show dbt output?" },
+                        function(output_mode)
+                            if not output_mode then return end
+                            local selected_ids = selectors.from_resources(selected)
+                            execute.run(operation, { "--select", table.concat(selected_ids, " ") }, function(result)
+                                if result.code ~= 0 then
+                                    log.error(result.stderr ~= "" and result.stderr or result.stdout)
+                                elseif output_mode == "Open full output" then
+                                    display.popup(vim.split(result.stdout, "\n", { trimempty = true }))
+                                end
+                            end)
+                        end
+                    )
                 end
             )
         end)
