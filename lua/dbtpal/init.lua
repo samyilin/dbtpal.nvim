@@ -6,6 +6,22 @@ local config = require "dbtpal.config"
 
 local M = {}
 
+local function current_model()
+    if vim.bo.buftype ~= "" or (vim.bo.filetype ~= "dbt" and vim.bo.filetype ~= "sql") then
+        vim.notify("This command requires a dbt model buffer", vim.log.levels.WARN)
+        return nil
+    end
+    return vim.fn.expand "%:t:r"
+end
+
+local function selector(args)
+    if not args or not args[1] or args[1] == "" then
+        vim.notify("A dbt model selector is required", vim.log.levels.WARN)
+        return nil
+    end
+    return args[1]
+end
+
 M.config = config
 M.setup = config.setup
 
@@ -28,37 +44,47 @@ M.debug_all = function() return main.run_command "debug" end
 M.run_command = main.run_command
 
 -- Commands
-vim.api.nvim_create_user_command("DbtRun", function(cmd) main.run(cmd.args) end, { nargs = "?" })
+vim.api.nvim_create_user_command("DbtRun", function(cmd)
+    if current_model() then main.run(cmd.fargs) end
+end, { nargs = "*" })
 
-vim.api.nvim_create_user_command("DbtRunAll", function(cmd) main.run_all(cmd.args) end, { nargs = "?" })
+vim.api.nvim_create_user_command("DbtRunAll", function(cmd) main.run_all(cmd.fargs) end, { nargs = "*" })
 
-vim.api.nvim_create_user_command("DbtRunModel", function(cmd) main.run_model(cmd.args) end, { nargs = 1 })
+vim.api.nvim_create_user_command("DbtRunModel", function(cmd)
+    local value = selector(cmd.fargs)
+    if value then main.run_model(value) end
+end, { nargs = "*" })
 
-vim.api.nvim_create_user_command("DbtTest", function(cmd) main.test(cmd.args) end, { nargs = "?" })
+vim.api.nvim_create_user_command("DbtTest", function(cmd)
+    if current_model() then main.test(cmd.fargs) end
+end, { nargs = "*" })
 
-vim.api.nvim_create_user_command("DbtTestAll", function(cmd) main.test_all(cmd.args) end, { nargs = "?" })
+vim.api.nvim_create_user_command("DbtTestAll", function(cmd) main.test_all(cmd.fargs) end, { nargs = "*" })
 
-vim.api.nvim_create_user_command("DbtTestModel", function(cmd) main.test_model(cmd.args) end, { nargs = 1 })
+vim.api.nvim_create_user_command("DbtTestModel", function(cmd)
+    local value = selector(cmd.fargs)
+    if value then main.test_model(value) end
+end, { nargs = "*" })
 
 vim.api.nvim_create_user_command("DbtCompile", function(cmd)
     if vim.bo.buftype ~= "" or (vim.bo.filetype ~= "dbt" and vim.bo.filetype ~= "sql") then
         vim.notify("DbtCompile requires a dbt model buffer; use :DbtCompileAll for the project", vim.log.levels.WARN)
         return
     end
-    main.compile(vim.fn.expand "%:t:r", cmd.args)
-end, { nargs = "?" })
-vim.api.nvim_create_user_command("DbtCompileAll", function(cmd) main.compile(nil, cmd.args) end, { nargs = "?" })
-vim.api.nvim_create_user_command("DbtCompileModel", function(cmd) main.compile(cmd.args) end, { nargs = 1 })
+    main.compile(vim.fn.expand "%:t:r", cmd.fargs)
+end, { nargs = "*" })
+vim.api.nvim_create_user_command("DbtCompileAll", function(cmd) main.compile(nil, cmd.fargs) end, { nargs = "*" })
+vim.api.nvim_create_user_command("DbtCompileModel", function(cmd)
+    local value = selector(cmd.fargs)
+    if value then main.compile(value) end
+end, { nargs = "*" })
 vim.api.nvim_create_user_command("DbtCompileFloat", function() main.compile_float() end, { nargs = 0 })
 
-vim.api.nvim_create_user_command(
-    "DbtBuild",
-    function(cmd) main.build(vim.fn.expand "%:t:r", cmd.args) end,
-    { nargs = "?" }
-)
-vim.api.nvim_create_user_command("DbtBuildAll", function(cmd) main.build(nil, cmd.args) end, { nargs = "?" })
-vim.api.nvim_create_user_command("DbtBuildModel", function() main.build(vim.fn.expand "%:t:r") end, { nargs = 0 })
-vim.api.nvim_create_user_command("DbtDebugAll", function(cmd) main.run_command("debug", cmd.args) end, { nargs = "?" })
+vim.api.nvim_create_user_command("DbtBuild", function(cmd)
+    if current_model() then main.build(vim.fn.expand "%:t:r", cmd.fargs) end
+end, { nargs = "*" })
+vim.api.nvim_create_user_command("DbtBuildAll", function(cmd) main.build(nil, cmd.fargs) end, { nargs = "*" })
+vim.api.nvim_create_user_command("DbtDebugAll", function(cmd) main.run_command("debug", cmd.fargs) end, { nargs = "*" })
 
 local ok, _ = pcall(require, "telescope")
 if ok then M.dbt_picker = require("dbtpal.telescope").dbt_picker end

@@ -8,6 +8,7 @@ local M = {}
 
 local _cmd_select_args = function(cmd, selector, args)
     if args == "" then args = nil end
+    if type(args) == "string" then args = vim.split(args, " ", { trimempty = true }) end
     if selector == nil then return M._create_job(cmd, args) end
 
     if type(selector) == "string" then

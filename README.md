@@ -234,8 +234,8 @@ In Lua: `require('dbtpal').build()`
 
 Build the current model
 
-`DbtBuildAll` builds the project, while `DbtBuildModel` builds the current
-model. `DbtDebugAll` runs the project-wide `dbt debug` command.
+`DbtBuildAll` builds the project. `DbtDebugAll` runs the project-wide
+`dbt debug` command.
 
 
 ### Additional Lua Only Functions
