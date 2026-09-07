@@ -45,8 +45,17 @@ local function graph_picker(direction)
                     vim.cmd.edit(vim.fs.joinpath(root, item.path))
                     return
                 end
-                execute.run(action, { "--select", item.name }, function(result)
-                    if result.code ~= 0 then log.error(result.stderr ~= "" and result.stderr or result.stdout) end
+                vim.ui.select({ "Notify only", "Open full output" }, {
+                    prompt = "Show dbt output?",
+                }, function(output_mode)
+                    if not output_mode then return end
+                    execute.run(action, { "--select", item.name }, function(result)
+                        if result.code ~= 0 then
+                            log.error(result.stderr ~= "" and result.stderr or result.stdout)
+                        elseif output_mode == "Open full output" then
+                            display.popup(vim.split(result.stdout, "\n", { trimempty = true }))
+                        end
+                    end)
                 end)
             end)
         end)
