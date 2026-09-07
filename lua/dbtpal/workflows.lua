@@ -5,11 +5,13 @@ local picker = require "dbtpal.picker"
 local log = require "dbtpal.log"
 local display = require "dbtpal.display"
 local config = require "dbtpal.config"
+local context = require "dbtpal.context"
 
 local M = {}
 
 local function graph_picker(direction)
-    local model = vim.fn.expand "%:t:r"
+    local model = context.require_model_buffer()
+    if not model then return end
     local selector = require("dbtpal.selectors")[direction](model)
     resources.list({ selector = selector }, function(items, err)
         if err then
