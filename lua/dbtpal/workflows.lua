@@ -45,7 +45,7 @@ local function graph_picker(direction)
                     vim.cmd.edit(vim.fs.joinpath(root, item.path))
                     return
                 end
-                execute.run(action, { "--select", item.unique_id }, function(result)
+                execute.run(action, { "--select", item.name }, function(result)
                     if result.code ~= 0 then log.error(result.stderr ~= "" and result.stderr or result.stdout) end
                 end)
             end)
