@@ -9,11 +9,12 @@ function M.setup(picker)
                 source = {
                     name = opts.prompt or "Select",
                     items = opts.items or {},
-                    show = function(item)
+                    show = function(index)
+                        local item = (opts.items or {})[index]
                         if opts.format_item then return opts.format_item(item) end
                         return item.name or tostring(item)
                     end,
-                    choose = function(item) callback(item) end,
+                    choose = function(index) callback((opts.items or {})[index]) end,
                 },
             }
         end,
