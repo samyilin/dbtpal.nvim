@@ -11,12 +11,22 @@ local M = {}
 local function graph_picker(direction)
     local model = vim.fn.expand "%:t:r"
     local selector = require("dbtpal.selectors")[direction](model)
-    resources.list({ resource_type = "model", selector = selector }, function(items, err)
+    resources.list({ selector = selector }, function(items, err)
         if err then
             log.error(err.stderr ~= "" and err.stderr or "Unable to list dbt models")
             return
         end
-        items = vim.tbl_filter(function(item) return item.name ~= model end, items)
+        items = vim.tbl_filter(
+            function(item)
+                return item.name ~= model
+                    and (
+                        item.resource_type == "model"
+                        or item.resource_type == "seed"
+                        or item.resource_type == "snapshot"
+                    )
+            end,
+            items
+        )
         if #items == 0 then
             log.info("No " .. direction .. " models found for " .. model)
             return
