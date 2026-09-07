@@ -16,6 +16,11 @@ local function graph_picker(direction)
             log.error(err.stderr ~= "" and err.stderr or "Unable to list dbt models")
             return
         end
+        items = vim.tbl_filter(function(item) return item.name ~= model end, items)
+        if #items == 0 then
+            log.info("No " .. direction .. " models found for " .. model)
+            return
+        end
         picker.select({ items = items, prompt = "Select " .. direction .. " model" }, function(item)
             if not item then return end
             vim.ui.select({ "open", "run", "test", "compile", "build", "refresh" }, {
