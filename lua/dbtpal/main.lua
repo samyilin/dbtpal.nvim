@@ -143,8 +143,8 @@ M._create_job = function(cmd, args, output_mode)
         end
     end
 
-    local onexit = function(data)
-        if (output_mode or config.options.output_mode) == "float" then display.popup(data) end
+    local onexit = function(data, code)
+        if (output_mode or config.options.output_mode) == "float" or code ~= 0 then display.popup(data) end
     end
     if args == "" then args = nil end
     local dbt_path, cmd_args = commands.build_path_args(cmd, args)
@@ -163,7 +163,7 @@ M._create_job = function(cmd, args, output_mode)
             vim.list_extend(response, stderr)
         end
         if code == 0 then log.info("dbt " .. cmd .. " completed") end
-        vim.schedule(function() onexit(response) end)
+        vim.schedule(function() onexit(response, code) end)
     end)
     return job
 end
