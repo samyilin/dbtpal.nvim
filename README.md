@@ -304,3 +304,12 @@ The following options are available:
 
 Log level can be set with `vim.g.dbtpal_log_level` (must be **before** `setup()`)
 or on the command line: `DBTPAL_LOG_LEVEL=info nvim myfile.sql`
+## Development
+
+Install the repository hooks once with:
+
+```sh
+pre-commit install
+```
+
+Run them manually with `pre-commit run --all-files`.

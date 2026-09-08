@@ -29,14 +29,6 @@ local function has_selector(args)
     return false
 end
 
-local function selector(args)
-    if not args or not args[1] or args[1] == "" then
-        vim.notify("A dbt model selector is required", vim.log.levels.WARN)
-        return nil
-    end
-    return args[1]
-end
-
 M.config = config
 M.setup = config.setup
 M.context = context
@@ -75,6 +67,4 @@ vim.api.nvim_create_user_command("DbtSelectUpstream", function() workflows.selec
 vim.api.nvim_create_user_command("DbtSelectDownstream", function() workflows.select_downstream() end, { nargs = 0 })
 vim.api.nvim_create_user_command("DbtSelectFamily", function() workflows.select_family() end, { nargs = 0 })
 
-local ok, _ = pcall(require, "telescope")
-if ok then M.dbt_picker = require("dbtpal.telescope").dbt_picker end
 return M
