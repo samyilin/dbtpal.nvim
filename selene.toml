@@ -1,4 +1,4 @@
-std = "neovim"
+std = "lua51+neovim"
 
 [lints]
 global_usage = "allow"
