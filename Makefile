@@ -14,6 +14,6 @@ test:
 
 lint:
 	@echo "Linting..."
-	luacheck ./lua
+	selene ./lua
 
 check: fmt test lint
