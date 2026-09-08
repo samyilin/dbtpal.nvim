@@ -14,6 +14,8 @@ M.defaults = {
     extended_path_search = true,
     protect_compiled_files = true,
     picker_backend = "default",
+    use_current_model = true,
+    output_mode = "float",
 
     pre_cmd_args = {},
     post_cmd_args = {},

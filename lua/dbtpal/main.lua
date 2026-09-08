@@ -6,17 +6,17 @@ local display = require "dbtpal.display"
 
 local M = {}
 
-local _cmd_select_args = function(cmd, selector, args)
+local _cmd_select_args = function(cmd, selector, args, output_mode)
     if args == "" then args = nil end
     if type(args) == "string" then args = vim.split(args, " ", { trimempty = true }) end
-    if selector == nil then return M._create_job(cmd, args) end
+    if selector == nil then return M._create_job(cmd, args, output_mode) end
 
     if type(selector) == "string" then
-        return M._create_job(cmd, vim.list_extend({ "--select", selector }, args or {}))
+        return M._create_job(cmd, vim.list_extend({ "--select", selector }, args or {}), output_mode)
     end
 
     if type(selector) == "table" then
-        return M._create_job(cmd, vim.list_extend({ "--select", table.concat(selector, " ") }, args or {}))
+        return M._create_job(cmd, vim.list_extend({ "--select", table.concat(selector, " ") }, args or {}), output_mode)
     end
 end
 
@@ -128,9 +128,9 @@ end
 
 M.build = function(selector, args) return _build(selector, args) end
 
-M.run_command = function(cmd, args) return _cmd_select_args(cmd, nil, args) end
+M.run_command = function(cmd, args, output_mode) return _cmd_select_args(cmd, nil, args, output_mode) end
 
-M._create_job = function(cmd, args)
+M._create_job = function(cmd, args, output_mode)
     log.info("dbt " .. cmd .. " started")
     if config.options.path_to_dbt_project == "" then
         local bpath = vim.fn.expand "%:p:h"
@@ -143,7 +143,9 @@ M._create_job = function(cmd, args)
         end
     end
 
-    local onexit = function(data) display.popup(data) end
+    local onexit = function(data)
+        if (output_mode or config.options.output_mode) == "float" then display.popup(data) end
+    end
     if args == "" then args = nil end
     local dbt_path, cmd_args = commands.build_path_args(cmd, args)
     local job = vim.system(vim.list_extend({ dbt_path }, cmd_args), { text = true }, function(result)
