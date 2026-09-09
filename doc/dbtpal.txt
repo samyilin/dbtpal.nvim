@@ -1,284 +1,207 @@
-*dbtpal.txt*             For NVIM v0.8.0             Last change: 2025 June 19
+*dbtpal.txt*  dbtpal.nvim reference        Last change: 2026 Sep 08
 
 ==============================================================================
-Table of Contents                                   *dbtpal-table-of-contents*
+CONTENTS                                                  *dbtpal-contents*
 
-  - dbtpal.nvim                                           |dbtpal-dbtpal.nvim|
-  - Maintenance Note!                               |dbtpal-maintenance-note!|
-1. ✨Features                                            |dbtpal-✨features|
-  - ⚡️ Requirements               |dbtpal-✨features-⚡️-requirements|
-  - ⚙ Installation                     |dbtpal-✨features-⚙-installation|
-  - 🙈 Commands                           |dbtpal-✨features-🙈-commands|
-2. Links                                                        |dbtpal-links|
-
-DBTPAL.NVIM                                               *dbtpal-dbtpal.nvim*
-
-A Neovim plugin for dbt model editing. The little helper I wish I always had.
-
-
-MAINTENANCE NOTE!                                   *dbtpal-maintenance-note!*
-
-I don’t use dbt day-to-day so I don’t spend much time on this package.
-However, I do still accept issues and PRs, so please continue to send them in.
-
+  1. Introduction ................... |dbtpal-introduction|
+  2. Requirements ................... |dbtpal-requirements|
+  3. Setup .......................... |dbtpal-setup|
+  4. Commands ....................... |dbtpal-commands|
+  5. Lua API ........................ |dbtpal-lua|
+  6. Pickers ........................ |dbtpal-pickers|
+  7. Primitives ..................... |dbtpal-primitives|
+  8. Compatibility .................. |dbtpal-compatibility|
+  9. Development .................... |dbtpal-development|
 
 ==============================================================================
-1. ✨Features                                            *dbtpal-✨features*
+1. INTRODUCTION                                        *dbtpal-introduction*
 
-- Run / test open model, the entire project, or arbitrary selectors
-- Async jobs with pop-up command outputs
-- Custom dbt filetype with better syntax highlighting
-- Disables accidentally modifying sql files in the target folders
-- Jump to any `ref` or `source` model using `gf` (go-to-file)
-- Telescope Extension to fuzzy-find models
-- Automatically detect dbt project folder
+dbtpal.nvim runs dbt from Neovim using the `dbt` CLI. It provides a
+single pass-through command plus picker workflows for selecting models
+and graph neighbours.
 
-I do welcome requests and use-cases, so feel free to reach out on Twitter
-(@pdrmnvd <https://twitter.com/pdrmnvd>) or by creating an issue.
+There are no mandatory runtime dependencies.
 
+==============================================================================
+2. REQUIREMENTS                                        *dbtpal-requirements*
 
-⚡️ REQUIREMENTS                   *dbtpal-✨features-⚡️-requirements*
+  - Neovim >= 0.12 (`vim.system()` is required)
+  - dbt >= 1.0 installed and on `PATH`, or configured explicitly
 
-- Neovim >=0.5.0
-- dbt <https://docs.getdbt.com/dbt-cli/installation> >=1.0.0
-- plenary.nvim <https://github.com/nvim-lua/plenary.nvim>
+Optional picker backends:
 
+  - telescope.nvim (only if `picker_backend = "telescope"`)
+  - mini.pick (only if `picker_backend = "mini.pick"`)
 
-⚙ INSTALLATION                         *dbtpal-✨features-⚙-installation*
-
-Install using your favorite plugin manager:
-
-**Using Packer**
+==============================================================================
+3. SETUP                                                    *dbtpal-setup*
 
 >lua
-    use {
-        "PedramNavid/dbtpal",
-        config = function()
-            local dbt = require("dbtpal")
-            dbt.setup({
-                -- Path to the dbt executable
-                path_to_dbt = "dbt",
-    
-                -- Path to the dbt project, if blank, will auto-detect
-                -- using currently open buffer for all sql,yml, and md files
-                path_to_dbt_project = "",
-    
-                -- Path to dbt profiles directory
-                path_to_dbt_profiles_dir = vim.fn.expand("~/.dbt"),
-    
-                -- flags to include in dbt command
-                include_profiles_dir = true,  -- --profiles-dir
-                include_project_dir = true,  -- --project-dir
-                include_log_level = true,  --  --log-level=INFO
-    
-                -- Search for ref/source files in macros and models folders
-                extended_path_search = true,
-    
-                -- Prevent modifying sql files in target/(compiled|run) folders
-                protect_compiled_files = true,
-    
-                -- additional flags to include at the beginning of the rendered dbt command
-                pre_cmd_args = {},
-    
-                -- additional flags to include at the end of the rendered dbt command
-                post_cmd_args = {},
-            })
-    
-            -- Setup key mappings
-    
-            vim.keymap.set("n", "<leader>drf", dbt.run)
-            vim.keymap.set("n", "<leader>drp", dbt.run_all)
-            vim.keymap.set("n", "<leader>dtf", dbt.test)
-            vim.keymap.set("n", "<leader>dm", "<cmd>DbtSelectModels<cr>")
-    
-            -- Enable Telescope Extension
-        end,
-        requires = { { "nvim-lua/plenary.nvim" }, { "nvim-telescope/telescope.nvim" } },
-    }
+  require("dbtpal").setup({
+    path_to_dbt = "dbt",
+    path_to_dbt_project = "",
+    path_to_dbt_profiles_dir = vim.fn.expand("~/.dbt"),
+    include_profiles_dir = true,
+    include_project_dir = true,
+    include_log_level = true,
+    extended_path_search = true,
+    protect_compiled_files = true,
+    custom_dbt_syntax_enabled = true,
+    picker_backend = "default",
+    use_current_model = true,
+    output_mode = "float",
+    pre_cmd_args = {},
+    post_cmd_args = {},
+  })
 <
 
-**Using lazy.nvim**
-
-Show configuration… ~
-
->lua
-    {
-        "PedramNavid/dbtpal",
-        dependencies = {
-            "nvim-lua/plenary.nvim",
-            "nvim-telescope/telescope.nvim",
-        },
-        ft = {
-            "sql",
-            "md",
-            "yaml",
-        },
-        keys = {
-            { "<leader>db", "<cmd>Dbt<cr>" },
-            { "<leader>dm", "<cmd>DbtSelectModels<cr>" },
-        },
-        config = function()
-            require("dbtpal").setup({
-                path_to_dbt = "dbt",
-                path_to_dbt_project = "",
-                path_to_dbt_profiles_dir = vim.fn.expand("~/.dbt"),
-                include_profiles_dir = true,
-                include_project_dir = true,
-                include_log_level = true,
-                extended_path_search = true,
-                protect_compiled_files = true,
-                pre_cmd_args = {},
-                post_cmd_args = {},
-            })
-        end,
-    }
-<
-
-
-🙈 COMMANDS                               *dbtpal-✨features-🙈-commands*
-
-dbtpal has sensible defaults and can auto-detect project directories based on
-the currently open buffer when first run.
-
-Your typical dbt commands are supported in three modes: current model, all
-models, and user-specified models. See the sample setup above for some common
-mappings.
-
-Commands can be either invoked as vim user-commands or through lua. Lua calls
-provide more flexibility if additional arguments are required, but
-user-commands work well if all you need is the default behavior, with a single
-model selector argument.
-
-
-DBTRUN
-
-In Lua: `require('dbtpal').run()`
-
-Run the current model
-
-
-DBTRUNALL
-
-In Lua: `require('dbtpal').run_all()`
-
-Run all models in the project
-
-
-DBTRUNMODEL
-
-In Lua: `require('dbtpal').run_model('+my_second_dbt_model')`
-
-Run a specific model or selector. Requires a model selector argument.
-
-Example: `DbtRunModel +my_second_dbt_model`
-
-
-DBTTEST
-
-In Lua: `require('dbtpal').test()`
-
-Test the current model
-
-
-DBTTESTALL
-
-In Lua: `require('dbtpal').test_all()`
-
-Test all models in the project
-
-
-DBTTESTMODEL
-
-In Lua: `require('dbtpal').test_model('+my_second_dbt_model')`
-
-Test a specific model or selector. Requires a model selector argument.
-
-Example: `DbtTestModel +my_second_dbt_model`
-
-
-DBTCOMPILE
-
-In Lua: `require('dbtpal').compile()`
-
-Compile the current model
-
-
-DBTBUILD
-
-In Lua: `require('dbtpal').build()`
-
-Build the current model
-
-
-ADDITIONAL LUA ONLY FUNCTIONS ~
-
-These commands are only available as Lua-only commands. You can map them to
-specific key-bindings if you wish.
-
-`require('dbtpal').run_children()`: equivalent to `dbt run -s model+`
-
-`require('dbtpal').run_parents()`: equivalent to `dbt run -s +model`
-
-`require('dbtpal').run_family()`: equivalent to `dbt run -s +model+`
-
-
- CONFIGURATION ~
-
-You can override default configuration options by passing a table to
-`setup({})`. See the Installation section for an example
-
->
-    require("dbtpal").setup({ ... })
-<
-
-The following options are available:
-
-  --------------------------------------------------------------------------------
-  Option                     Description                      Default
-  -------------------------- -------------------------------- --------------------
-  path_to_dbt                Path to the dbt executable       dbt (i.e. dbt in the
-                                                              local path)
-
-  path_to_dbt_project        Path to the dbt project          "" (auto-detect)
-
-  path_to_dbt_profiles_dir   Path to dbt profiles directory   "~/.dbt"
-
-  extended_path_search       Search for ref/source files in   true
-                             macros and models folders        
-
-  protect_compiled_files     Prevent modifying sql files in   true
-                             target/(compiled|run) folders    
-
-  include_profiles_dir       Include --profiles-dir flag in   true
-                             dbt command                      
-
-  include_project_dir        Include --project-dir flag in    true
-                             dbt command                      
-
-  include_log_level          Include --log-level=INFO flag in true
-                             dbt command (only for dbt >=     
-                             1.5)                             
-
-  pre_cmd_args               Additional flags to include at   {}
-                             the beginning of the rendered    
-                             dbt command                      
-
-  porst_cmd_args             Additional flags to include at   {}
-                             the end of the rendered dbt      
-                             command                          
-  --------------------------------------------------------------------------------
-
-MISC ~
-
-Log level can be set with `vim.g.dbtpal_log_level` (must be **before**
-`setup()`) or on the command line: `DBTPAL_LOG_LEVEL=info nvim myfile.sql`
+The following options matter most:
+
+  `picker_backend`  `"default"`, `"telescope"`, or `"mini.pick"`.
+  `use_current_model`  When true, `run`, `test`, `compile`, and
+                    `build` without `--select` use the current model.
+  `output_mode`     `"float"` opens output always; `"notify"` opens
+                    output on failure or `:Dbt!`.
+
+`path_to_dbt`, `DBT_EXECUTABLE`, `path_to_dbt_profiles_dir`, and
+`DBT_PROFILES_DIR` select the dbt binary, project, and profile. dbt
+itself resolves `profiles.yml`, targets, adapters, variables, and
+environment overrides.
 
 ==============================================================================
-2. Links                                                        *dbtpal-links*
+4. COMMANDS                                                *dbtpal-commands*
 
-1. *image*: https://raw.githubusercontent.com/PedramNavid/dbtpal/main/assets/dbt%20model%20run.gif
-2. *@pdrmnvd*: 
+                                                              *:Dbt*
+:Dbt {cmd} [args]   Run any dbt command, e.g.: >
+  :Dbt run
+  :Dbt test --select my_model
+  :Dbt compile --select my_model
+  :Dbt build --full-refresh
+  :Dbt debug
+<
+With no arguments, `:Dbt` shows usage. Arguments are forwarded to dbt
+as a list; dbt resolves selectors, targets, profiles, and variables.
 
-Generated by panvimdoc <https://github.com/kdheepak/panvimdoc>
+When `use_current_model` is enabled and no `--select` or `-s` is
+given, `run`, `test`, `compile`, and `build` use the current SQL/dbt
+buffer model. Outside a model buffer the command warns and aborts.
+Use `--select '*'` for an explicit whole-project run.
+
+                                                             *:Dbt!*
+:Dbt! {cmd} [args]  Same as `:Dbt`, but always opens floating output.
+
+                                            *:DbtSelectModels*
+:DbtSelectModels    Pick one or more models, choose `run`, `test`,
+                    `compile`, or `build`, then choose `Notify only`
+                    or `Open full output`.
+
+The selection is passed as one `--select` value using resource names.
+`run` and `build` may modify the database; `test` tests existing
+relations; `compile` only renders SQL.
+
+                                          *:DbtSelectUpstream*
+:DbtSelectUpstream  Pick from upstream models, seeds, and snapshots,
+                   excluding the current model.
+
+                                        *:DbtSelectDownstream*
+:DbtSelectDownstream
+                    Same as above, for downstream dependents.
+
+                                            *:DbtSelectFamily*
+:DbtSelectFamily    Same as above, for upstream and downstream family.
+
+Each graph picker offers `open`, `run`, `test`, `compile`, `build`,
+and `refresh`. `open` edits the resource path; `refresh` reruns
+`dbt ls`. Execution also offers `Notify only` or `Open full output`.
+
+==============================================================================
+5. LUA API                                                      *dbtpal-lua*
+
+>lua
+  require("dbtpal").setup({ ... })
+  require("dbtpal").run_command("run", { "--select", "orders" })
+  require("dbtpal").list_resources({ resource_type = "model" }, cb)
+  require("dbtpal").select_models()
+  require("dbtpal").select_upstream()
+  require("dbtpal").select_downstream()
+  require("dbtpal").select_family()
+<
+
+Arguments are structured lists only, never shell strings: >
+
+  require("dbtpal").run_command("compile", { "--target", "prod" })
+<
+
+Lower-level modules remain available for integrations:
+
+  `require("dbtpal").context`    buffer and project context
+  `require("dbtpal").selectors`  selector constructors
+  `require("dbtpal").execute`    `vim.system()` runner
+  `require("dbtpal").picker`     picker registry and backends
+
+==============================================================================
+6. PICKERS                                                  *dbtpal-pickers*
+
+Set the backend with: >
+
+  require("dbtpal").setup({ picker_backend = "default" })
+<
+
+  `default`     Dependency-free `vim.ui.select()`. Multi-select is
+                repeated selection ending with `Done`.
+  `telescope`   Optional Telescope adapter, single selection.
+  `mini.pick`   Optional mini.pick adapter, single selection.
+
+Multi-selection falls back to the built-in implementation when an
+adapter supports only single selection. Cancel with `<Esc>` or `<C-c>`;
+cancelling a prompt aborts that workflow.
+
+==============================================================================
+7. PRIMITIVES                                            *dbtpal-primitives*
+
+The layers are independent:
+
+  context    Reject non-file, Oil, terminal, help, and non-SQL buffers
+             when a model is required. Normalize `oil://` URIs.
+  execute    Use the configured executable and `vim.system()`. Pass
+             arguments as a list. Add project/profile options once.
+             Return stdout, stderr, and exit code. Notify on
+             start/completion; surface failures.
+  resources  Run `dbt ls --output json` and normalize each row to
+             `unique_id`, `name`, `resource_type`,
+             `original_file_path`, `path`, and `package_name`.
+             Malformed JSON and nonzero exits are errors.
+  selectors  `model`, `+model`, `model+`, `+model+`, `tag:name`, and
+             `path:dir`. Selectors use resource names, not artifact
+             `unique_id` values.
+  picker     Core returns resources and accepts selections. Adapters
+             implement `select(opts, callback)` and optionally
+             `select_many(opts, callback)`.
+
+==============================================================================
+8. COMPATIBILITY                                      *dbtpal-compatibility*
+
+The compatibility surface is the CLI: `ls`, `run`, `test`, `compile`,
+`build`, and `debug`. The plugin does not import Python dbt or Fusion
+internals. Adapter, package, Python-model, flag, artifact, and `dbt ls`
+differences surface as command errors.
+
+`dbt compile` renders SQL; it does not guarantee executable output.
+Use `run`, `test`, or `build` to execute or validate relations.
+
+==============================================================================
+9. DEVELOPMENT                                            *dbtpal-development*
+
+Install hooks once: >
+
+  pre-commit install
+<
+Run hooks and tests: >
+
+  pre-commit run --all-files
+  make test
+<
+Tests run in headless Neovim with no Plenary dependency. Formatting
+uses StyLua; linting uses Selene.
 
 vim:tw=78:ts=8:noet:ft=help:norl:
