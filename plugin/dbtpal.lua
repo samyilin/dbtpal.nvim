@@ -1,5 +1,5 @@
-if 1 ~= vim.fn.has "nvim-0.7.0" then
-    vim.api.nvim_err_writeln "dbtpal requires at least nvim-0.7.0."
+if vim.fn.has "nvim-0.12" ~= 1 then
+    vim.notify("dbtpal requires Neovim 0.12 or later.", vim.log.levels.ERROR)
     return
 end
 
