@@ -11,6 +11,7 @@ if config.options.custom_dbt_syntax_enabled then
         pattern = { "*.sql" },
         callback = function()
             vim.bo.filetype = "sql"
+            vim.b.current_syntax = nil
             vim.cmd "runtime syntax/dbt.vim"
         end,
         desc = "Enable custom dbt syntax on top of SQL",
