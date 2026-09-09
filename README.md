@@ -92,7 +92,6 @@ use {
         vim.keymap.set("n", "<leader>db", "<cmd>Dbt<cr>")
         vim.keymap.set("n", "<leader>dm", "<cmd>DbtSelectModels<cr>")
     end,
-    requires = { { "nvim-lua/plenary.nvim" }, { "nvim-telescope/telescope.nvim" } },
 }
 ```
 
@@ -105,8 +104,7 @@ use {
 {
     "PedramNavid/dbtpal",
     dependencies = {
-        "nvim-lua/plenary.nvim",
-        "nvim-telescope/telescope.nvim",
+        -- Telescope and mini.pick are optional picker backends.
     },
     ft = {
         "sql",
@@ -306,3 +304,5 @@ pre-commit install
 ```
 
 Run them manually with `pre-commit run --all-files`.
+
+The test suite runs directly in headless Neovim and has no Plenary dependency.
