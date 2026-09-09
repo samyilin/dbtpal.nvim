@@ -89,10 +89,9 @@ Install using your favorite plugin manager:
             vim.keymap.set("n", "<leader>drf", dbt.run)
             vim.keymap.set("n", "<leader>drp", dbt.run_all)
             vim.keymap.set("n", "<leader>dtf", dbt.test)
-            vim.keymap.set("n", "<leader>dm", require("dbtpal.telescope").dbt_picker)
+            vim.keymap.set("n", "<leader>dm", "<cmd>DbtSelectModels<cr>")
     
             -- Enable Telescope Extension
-            require("telescope").load_extension("dbtpal")
         end,
         requires = { { "nvim-lua/plenary.nvim" }, { "nvim-telescope/telescope.nvim" } },
     }
@@ -115,10 +114,8 @@ Show configuration… ~
             "yaml",
         },
         keys = {
-            { "<leader>drf", "<cmd>DbtRun<cr>" },
-            { "<leader>drp", "<cmd>DbtRunAll<cr>" },
-            { "<leader>dtf", "<cmd>DbtTest<cr>" },
-            { "<leader>dm", "<cmd>lua require('dbtpal.telescope').dbt_picker()<cr>" },
+            { "<leader>db", "<cmd>Dbt<cr>" },
+            { "<leader>dm", "<cmd>DbtSelectModels<cr>" },
         },
         config = function()
             require("dbtpal").setup({
@@ -133,7 +130,6 @@ Show configuration… ~
                 pre_cmd_args = {},
                 post_cmd_args = {},
             })
-            require("telescope").load_extension("dbtpal")
         end,
     }
 <

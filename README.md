@@ -89,13 +89,8 @@ use {
 
         -- Setup key mappings
 
-        vim.keymap.set("n", "<leader>drf", dbt.run)
-        vim.keymap.set("n", "<leader>drp", dbt.run_all)
-        vim.keymap.set("n", "<leader>dtf", dbt.test)
-        vim.keymap.set("n", "<leader>dm", require("dbtpal.telescope").dbt_picker)
-
-        -- Enable Telescope Extension
-        require("telescope").load_extension("dbtpal")
+        vim.keymap.set("n", "<leader>db", "<cmd>Dbt<cr>")
+        vim.keymap.set("n", "<leader>dm", "<cmd>DbtSelectModels<cr>")
     end,
     requires = { { "nvim-lua/plenary.nvim" }, { "nvim-telescope/telescope.nvim" } },
 }
@@ -119,12 +114,10 @@ use {
         "yaml",
     },
     keys = {
-        { "<leader>drf", "<cmd>DbtRun<cr>" },
-        { "<leader>drp", "<cmd>DbtRunAll<cr>" },
-        { "<leader>dtf", "<cmd>DbtTest<cr>" },
-        { "<leader>dm", "<cmd>lua require('dbtpal.telescope').dbt_picker()<cr>" },
-        { "<leader>du", "<cmd>lua require('dbtpal.telescope').dbt_picker_upstream()<cr>" },
-        { "<leader>dd", "<cmd>lua require('dbtpal.telescope').dbt_picker_downstream()<cr>" },
+         { "<leader>db", "<cmd>Dbt<cr>" },
+         { "<leader>dm", "<cmd>DbtSelectModels<cr>" },
+         { "<leader>du", "<cmd>DbtSelectUpstream<cr>" },
+         { "<leader>dd", "<cmd>DbtSelectDownstream<cr>" },
     },
     config = function()
         require("dbtpal").setup({
