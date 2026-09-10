@@ -1,6 +1,8 @@
 # TODO
 
 - Record new demo GIFs for the `:Dbt` command and picker workflows.
+- Validate `DbtGotoModel` on `source()` jumps and cross-package models in a
+  project that has them (Jaffle Shop has neither).
 
 - Improve `DbtSelectModels` compile output: when multiple models are selected,
   offer access to each generated SQL artifact instead of showing only dbt's
