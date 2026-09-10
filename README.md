@@ -94,6 +94,22 @@ Install using your favorite plugin manager:
 }
 ```
 
+**Using vim.pack**
+
+```lua
+vim.pack.add({ { src = "https://github.com/samyilin/dbtpal.nvim" } })
+
+require("dbtpal").setup({
+  path_to_dbt = vim.env.DBT_EXECUTABLE or "dbt",
+  path_to_dbt_project = "",
+  path_to_dbt_profiles_dir = vim.env.DBT_PROFILES_DIR or vim.fn.expand("~/.dbt"),
+  picker_backend = "mini.pick",
+})
+
+vim.keymap.set("n", "<leader>db", "<cmd>Dbt<cr>")
+vim.keymap.set("n", "<leader>dm", "<cmd>DbtSelectModels<cr>")
+```
+
 ## Commands
 
 dbtpal has sensible defaults and can auto-detect project directories based
