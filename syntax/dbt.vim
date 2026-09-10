@@ -10,46 +10,54 @@ endif
 " Import default SQL syntax
 runtime! syntax/sql.vim
 
+" sqlFold uses contains=ALL, which lets Jinja keywords shadow SQL keywords
+" outside {{ }} blocks. Redefine it with the Jinja keyword groups excluded;
+" template regions below still list them in their own contains.
+if hlexists("sqlFold")
+    syn clear sqlFold
+    syn region sqlFold start='^\s*\zs\c\(Create\|Update\|Alter\|Select\|Insert\)' end=';$\|^$' transparent fold contains=ALLBUT,jinjaStatement,jinjaFilter,jinjaTest,jinjaFunction
+endif
+
 syntax case ignore
 
 
 " Borrowed from lepture/vim-jinja, these are jinja specific
 " keywords that are matched withi jinja regions {{ .. }} and
 " {% ... %}
-syn keyword jinjaStatement contained if else elif endif is not
-syn keyword jinjaStatement contained for in recursive endfor
-syn keyword jinjaStatement contained raw endraw
-syn keyword jinjaStatement contained block endblock extends super scoped
-syn keyword jinjaStatement contained macro endmacro call endcall
-syn keyword jinjaStatement contained from import as do continue break
-syn keyword jinjaStatement contained filter endfilter set endset
-syn keyword jinjaStatement contained include ignore missing
-syn keyword jinjaStatement contained with without context endwith
-syn keyword jinjaStatement contained trans endtrans pluralize
-syn keyword jinjaStatement contained autoescape endautoescape
+syn keyword jinjaStatement contained containedin=dbtJinjaTemplate if else elif endif is not
+syn keyword jinjaStatement contained containedin=dbtJinjaTemplate for in recursive endfor
+syn keyword jinjaStatement contained containedin=dbtJinjaTemplate raw endraw
+syn keyword jinjaStatement contained containedin=dbtJinjaTemplate block endblock extends super scoped
+syn keyword jinjaStatement contained containedin=dbtJinjaTemplate macro endmacro call endcall
+syn keyword jinjaStatement contained containedin=dbtJinjaTemplate from import as do continue break
+syn keyword jinjaStatement contained containedin=dbtJinjaTemplate filter endfilter set endset
+syn keyword jinjaStatement contained containedin=dbtJinjaTemplate include ignore missing
+syn keyword jinjaStatement contained containedin=dbtJinjaTemplate with without context endwith
+syn keyword jinjaStatement contained containedin=dbtJinjaTemplate trans endtrans pluralize
+syn keyword jinjaStatement contained containedin=dbtJinjaTemplate autoescape endautoescape
 
 hi def link jinjaStatement Statement
 
 " jinja templete built-in filters
-syn keyword jinjaFilter contained abs attr batch capitalize center default
-syn keyword jinjaFilter contained dictsort escape filesizeformat first
-syn keyword jinjaFilter contained float forceescape format groupby indent
-syn keyword jinjaFilter contained int join last length list lower pprint
-syn keyword jinjaFilter contained random replace reverse round safe slice
-syn keyword jinjaFilter contained sort string striptags sum
-syn keyword jinjaFilter contained title trim truncate upper urlize
-syn keyword jinjaFilter contained wordcount wordwrap
+syn keyword jinjaFilter contained containedin=dbtJinjaTemplate abs attr batch capitalize center default
+syn keyword jinjaFilter contained containedin=dbtJinjaTemplate dictsort escape filesizeformat first
+syn keyword jinjaFilter contained containedin=dbtJinjaTemplate float forceescape format groupby indent
+syn keyword jinjaFilter contained containedin=dbtJinjaTemplate int join last length list lower pprint
+syn keyword jinjaFilter contained containedin=dbtJinjaTemplate random replace reverse round safe slice
+syn keyword jinjaFilter contained containedin=dbtJinjaTemplate sort string striptags sum
+syn keyword jinjaFilter contained containedin=dbtJinjaTemplate title trim truncate upper urlize
+syn keyword jinjaFilter contained containedin=dbtJinjaTemplate wordcount wordwrap
 
 hi def link jinjaFilter Identifier
 
 " jinja template built-in tests
-syn keyword jinjaTest contained callable defined divisibleby escaped
-syn keyword jinjaTest contained even iterable lower mapping none number
-syn keyword jinjaTest contained odd sameas sequence string undefined upper
+syn keyword jinjaTest contained containedin=dbtJinjaTemplate callable defined divisibleby escaped
+syn keyword jinjaTest contained containedin=dbtJinjaTemplate even iterable lower mapping none number
+syn keyword jinjaTest contained containedin=dbtJinjaTemplate odd sameas sequence string undefined upper
 
 hi def link jinjaTest Type
 
-syn keyword jinjaFunction contained range lipsum dict cycler joiner
+syn keyword jinjaFunction contained containedin=dbtJinjaTemplate range lipsum dict cycler joiner
 hi def link jinjaFunction Function
 
 " Keywords to highlight within comments
@@ -73,16 +81,15 @@ syn keyword dbtJinjaFunction    ref source config var   containedin=dbtJinjaTemp
 syn match   dbtJinjaFunction    "\v\S+\ze\(\_.{-}\)"      containedin=dbtJinjaTemplate
 syn region  dbtJinjaString      matchgroup=Quote start=+"+ end=+"+ skipwhite keepend containedin=dbtJinjaTemplate
 syn region  dbtJinjaString      matchgroup=Quote start=+'+ end=+'+ skipwhite keepend containedin=dbtJinjaTemplate
-syn match   dbtJinjaOperator    "{{\|}}\|{%\|%}"
 
 hi link     dbtJinjaOperator    Operator
 hi link     dbtJinjaFunction    Function
 hi link     dbtJinjaString      String
 
-syn cluster dbtJinja           contains=dbtJinjaOperator,dbtJinjaFunction,dbtJinjaString
+syn cluster dbtJinja           contains=dbtJinjaFunction,dbtJinjaString
 
-syn region  dbtJinjaTemplate   start=+{%+ end=+%}+ contains=@dbtJinja,jinjaStatement,jinjaFilter,dbtJinjaTemplate transparent 
-syn region  dbtJinjaTemplate   start=+{{+ end=+}}+ contains=@dbtJinja,jinjaStatement,jinjaFilter,dbtJinjaTemplate transparent
+syn region  dbtJinjaTemplate   matchgroup=dbtJinjaOperator start=+{%+ end=+%}+ contains=@dbtJinja,jinjaStatement,jinjaFilter,dbtJinjaTemplate transparent
+syn region  dbtJinjaTemplate   matchgroup=dbtJinjaOperator start=+{{+ end=+}}+ contains=@dbtJinja,jinjaStatement,jinjaFilter,dbtJinjaTemplate transparent
 
 " CTE name, attempts to match xxx in > xxx as ( ... )
 syn match   dbtJinjaKeyword     "\v\S+\ze\s+as\s+\(\_.{-}\)"
