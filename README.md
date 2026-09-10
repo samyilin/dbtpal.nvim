@@ -160,7 +160,8 @@ existing relations; `compile` only renders SQL.
 These query dbt for related models, seeds, and snapshots (excluding the
 current model), then let you `open`, `run`, `test`, `compile`, `build`, or
 `refresh` the selection. Execution also offers `Notify only` or
-`Open full output`.
+`Open full output`. The graph pickers work from model (SQL/dbt) buffers as
+well as seed (CSV) buffers.
 
 ### DbtGotoModel, DbtRefreshGraph
 
