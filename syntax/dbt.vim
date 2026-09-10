@@ -82,11 +82,22 @@ syn match   dbtJinjaFunction    "\v\S+\ze\(\_.{-}\)"      containedin=dbtJinjaTe
 syn region  dbtJinjaString      matchgroup=Quote start=+"+ end=+"+ skipwhite keepend containedin=dbtJinjaTemplate
 syn region  dbtJinjaString      matchgroup=Quote start=+'+ end=+'+ skipwhite keepend containedin=dbtJinjaTemplate
 
+" dbt context objects available in every template
+syn keyword dbtJinjaVariable    target run_started_at invocation_id containedin=dbtJinjaTemplate
+syn keyword dbtJinjaVariable    flags exceptions modules store_result containedin=dbtJinjaTemplate
+
+" Common config() keys
+syn keyword dbtJinjaConfig      materialized schema alias database tags containedin=dbtJinjaTemplate
+syn keyword dbtJinjaConfig      unique_key on_schema_change on_configuration_change containedin=dbtJinjaTemplate
+syn keyword dbtJinjaConfig      persist_docs pre_hook post_hook grants contract containedin=dbtJinjaTemplate
+
 hi link     dbtJinjaOperator    Operator
 hi link     dbtJinjaFunction    Function
 hi link     dbtJinjaString      String
+hi link     dbtJinjaVariable    Identifier
+hi link     dbtJinjaConfig      Special
 
-syn cluster dbtJinja           contains=dbtJinjaFunction,dbtJinjaString
+syn cluster dbtJinja           contains=dbtJinjaFunction,dbtJinjaString,dbtJinjaVariable,dbtJinjaConfig
 
 syn region  dbtJinjaTemplate   matchgroup=dbtJinjaOperator start=+{%+ end=+%}+ contains=@dbtJinja,jinjaStatement,jinjaFilter,dbtJinjaTemplate transparent
 syn region  dbtJinjaTemplate   matchgroup=dbtJinjaOperator start=+{{+ end=+}}+ contains=@dbtJinja,jinjaStatement,jinjaFilter,dbtJinjaTemplate transparent
