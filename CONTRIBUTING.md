@@ -1,51 +1,43 @@
 ## Contributing
 
-To work on this project, you will want to fork and clone this repo locally,
-and then update your Neovim package manager to reference the local install.
+Fork and clone this repo, then point Neovim at the local checkout. With
+`vim.pack`:
 
-In Packer, it looks like this
-```
-use({
-    "~/projects/dbtpal",
-    requires = { { "nvim-lua/plenary.nvim" }, { "nvim-telescope/telescope.nvim" } },
-})
+```lua
+vim.pack.add({ { src = vim.fn.expand("~/projects/dbtpal.nvim") } })
 ```
 
-You may also want to bind a hotkey to fast reload the dbt module:
+There are no mandatory runtime dependencies. Telescope and mini.pick are
+optional picker backends only.
 
-```
-nnoremap { 'rr', function() require('plenary.reload').reload_module('dbtpal') end }
-```
+To reload the plugin during development, restart Neovim; Lua module
+caching makes in-session reloads unreliable.
 
-Note: even with reloading, sometimes you will need to restart Neovim to see
-changes.
+## Test dbt project
 
-## Dbt Test Project
+A small dbt project lives in `tests/dbt_project/`. It uses the DuckDB
+adapter:
 
-A test dbt project is included in the `tests/` folder. Copy the contents from
-the `profiles.yml` file to your `~/.dbt/profiles.yml` file. It uses the duckdb
-adapter, so make sure that is installed as well
-
-```
+```sh
 pip install dbt-core dbt-duckdb
-```
-
-Finally make sure you can compile and run the dbt project
-
-```
 dbt compile
 dbt run
 ```
 
-## Running Neovim
+## Hooks, format, lint, tests
 
-You may wish to increase the log level before opening Neovim
-
+```sh
+pre-commit install
+pre-commit run --all-files
+make test
 ```
-DBTPAL_LOG_LEVEL=debug nvim
-```
 
-## Testing in a blank environment
+Tests run in headless Neovim (`tests/run.lua`) with no Plenary
+dependency. Formatting uses StyLua; linting uses Selene with the
+checked-in `selene.toml` / `neovim.toml` standards.
 
-Use `vim-plug` 
-nvim -U init.lua -c PlugInstall -c qa --headless
+## Docs
+
+Command and API reference lives in `doc/dbtpal.txt` (Neovim help
+format). After editing it, regenerate tags with `:helptags doc`
+(`doc/tags` is gitignored).
