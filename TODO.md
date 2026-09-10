@@ -1,5 +1,7 @@
 # TODO
 
+- Record new demo GIFs for the `:Dbt` command and picker workflows.
+
 - Improve `DbtSelectModels` compile output: when multiple models are selected,
   offer access to each generated SQL artifact instead of showing only dbt's
   aggregate command output. Keep `Notify only` and execution output behavior
