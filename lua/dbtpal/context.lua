@@ -4,7 +4,8 @@ local projects = require "dbtpal.projects"
 local M = {}
 
 function M.current_model()
-    if vim.bo.buftype ~= "" or (vim.bo.filetype ~= "sql" and vim.bo.filetype ~= "dbt") then return nil end
+    local filetype = vim.bo.filetype
+    if vim.bo.buftype ~= "" or (filetype ~= "sql" and filetype ~= "dbt" and filetype ~= "csv") then return nil end
     local name = vim.fn.expand "%:t:r"
     return name ~= "" and name or nil
 end
