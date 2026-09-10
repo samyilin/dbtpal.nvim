@@ -8,3 +8,5 @@
 - Thoroughly test graph commands from non-SQL and Oil buffers.
 - Test configured dbt executable, profiles directory, and explicit CLI
   arguments.
+- Once the public API stabilizes, flesh out `neovim.toml` beyond `any = true`
+  so Selene validates Neovim API usage shape, not just global existence.
