@@ -1,4 +1,5 @@
 local execute = require "dbtpal.execute"
+local graph = require "dbtpal.graph"
 local resources = require "dbtpal.resources"
 local selectors = require "dbtpal.selectors"
 local picker = require "dbtpal.picker"
@@ -65,6 +66,52 @@ end
 M.select_upstream = function() graph_picker "upstream" end
 M.select_downstream = function() graph_picker "downstream" end
 M.select_family = function() graph_picker "family" end
+
+function M.goto_model()
+    local project = graph.project_dir() or context.project_for_buffer()
+    if not project then
+        log.warn "Could not detect dbt project dir"
+        return
+    end
+    local ref = graph.parse_model_ref(vim.api.nvim_get_current_line())
+    if not ref then
+        log.warn "No ref() or source() call on the current line"
+        return
+    end
+    graph.load(project, function(index, err)
+        if err then
+            log.error(err)
+            return
+        end
+        local entries = index.by_name[ref.name] or {}
+        if #entries == 0 then
+            log.warn("Unknown model: " .. ref.name)
+            return
+        end
+        if #entries > 1 then log.info("Multiple matches for " .. ref.name .. "; opening the first") end
+        local entry = entries[1]
+        if not entry.path then
+            log.warn("No file path for " .. ref.name)
+            return
+        end
+        vim.cmd.edit(vim.fs.joinpath(project, entry.path))
+    end)
+end
+
+function M.refresh_graph()
+    local project = graph.project_dir() or context.project_for_buffer()
+    if not project then
+        log.warn "Could not detect dbt project dir"
+        return
+    end
+    graph.refresh(project, function(_, err)
+        if err then
+            log.error(err)
+        else
+            log.info "dbt graph cache refreshed"
+        end
+    end)
+end
 
 function M.select_models()
     resources.list({ resource_type = "model" }, function(items, err)

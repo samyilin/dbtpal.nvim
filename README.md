@@ -162,6 +162,28 @@ current model), then let you `open`, `run`, `test`, `compile`, `build`, or
 `refresh` the selection. Execution also offers `Notify only` or
 `Open full output`.
 
+### DbtGotoModel, DbtRefreshGraph
+
+`DbtGotoModel` jumps to the model referenced by the `ref()` or
+`source()` call on the current line:
+
+```vim
+:DbtGotoModel
+```
+
+```lua
+vim.keymap.set("n", "gd", "<cmd>DbtGotoModel<cr>")
+```
+
+Resolution uses a cached dependency graph built from the project's
+`target/manifest.json` (falling back to `dbt ls`), so jumps are instant
+and exact across packages, seeds, and snapshots. `DbtRefreshGraph`
+rebuilds the cache:
+
+```vim
+:DbtRefreshGraph
+```
+
 ## Lua API
 
 ```lua
@@ -172,6 +194,8 @@ require("dbtpal").select_models()
 require("dbtpal").select_upstream()
 require("dbtpal").select_downstream()
 require("dbtpal").select_family()
+require("dbtpal").goto_model()
+require("dbtpal").refresh_graph()
 ```
 
 Arguments are structured Lua lists only, never shell strings:

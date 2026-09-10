@@ -1,4 +1,5 @@
 local commands = require "dbtpal.commands"
+local graph = require "dbtpal.graph"
 local projects = require "dbtpal.projects"
 local resources = require "dbtpal.resources"
 local selectors = require "dbtpal.selectors"
@@ -47,6 +48,51 @@ it("normalizes dbt resources", function()
     assert.are.equal("model.project.orders", resource.unique_id)
     assert.are.equal("models/orders.sql", resource.path)
     assert.are.equal("model", resource.resource_type)
+end)
+
+it("indexes graph nodes and walks lineage", function()
+    local index = graph.build_index {
+        ["seed.proj.raw"] = {
+            name = "raw",
+            resource_type = "seed",
+            package_name = "proj",
+            original_file_path = "seeds/raw.csv",
+            depends_on = { nodes = {} },
+        },
+        ["model.proj.stg"] = {
+            name = "stg",
+            resource_type = "model",
+            package_name = "proj",
+            original_file_path = "models/stg.sql",
+            depends_on = { nodes = { "seed.proj.raw" } },
+        },
+        ["model.proj.final"] = {
+            name = "final",
+            resource_type = "model",
+            package_name = "proj",
+            original_file_path = "models/final.sql",
+            depends_on = { nodes = { "model.proj.stg" } },
+        },
+    }
+    local up = graph.upstream(index, "final")
+    assert.are.equal(2, #up)
+    assert.are.equal("stg", up[1].name)
+    assert.are.equal("raw", up[2].name)
+    local down = graph.downstream(index, "raw")
+    assert.are.equal(2, #down)
+    assert.are.equal("stg", down[1].name)
+    assert.are.equal("final", down[2].name)
+    assert.are.equal("models/stg.sql", index.by_name["stg"][1].path)
+end)
+
+it("parses ref and source calls", function()
+    local ref = graph.parse_model_ref "select * from {{ ref('orders') }}"
+    assert.are.equal("ref", ref.kind)
+    assert.are.equal("orders", ref.name)
+    local source = graph.parse_model_ref '{{ source("raw", "orders") }}'
+    assert.are.equal("source", source.kind)
+    assert.are.equal("orders", source.name)
+    assert(graph.parse_model_ref "select 1" == nil)
 end)
 
 it("finds the dbt project directory", function()
