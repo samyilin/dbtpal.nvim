@@ -34,4 +34,5 @@ end
 function describe(_, callback) callback() end
 
 dofile "tests/dbtpal_spec.lua"
+dofile "tests/syntax_spec.lua"
 if failures > 0 then error(failures .. " test(s) failed") end
