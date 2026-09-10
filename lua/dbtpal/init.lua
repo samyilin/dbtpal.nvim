@@ -14,14 +14,6 @@ local mini_picker = require "dbtpal.picker_mini"
 
 local M = {}
 
-local function current_model()
-    if vim.bo.buftype ~= "" or (vim.bo.filetype ~= "dbt" and vim.bo.filetype ~= "sql") then
-        vim.notify("This command requires a dbt model buffer", vim.log.levels.WARN)
-        return nil
-    end
-    return vim.fn.expand "%:t:r"
-end
-
 local function has_selector(args)
     for _, arg in ipairs(args or {}) do
         if arg == "--select" or arg == "-s" then return true end
@@ -55,7 +47,7 @@ vim.api.nvim_create_user_command("Dbt", function(cmd)
     end
     local model_commands = { run = true, test = true, compile = true, build = true }
     if config.options.use_current_model and model_commands[command] and not has_selector(args) then
-        local model = current_model()
+        local model = context.require_model_buffer()
         if not model then return end
         vim.list_extend(args, { "--select", model })
     end
