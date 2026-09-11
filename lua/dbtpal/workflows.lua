@@ -11,6 +11,12 @@ local M = {}
 
 local graph_picker
 
+local function require_project()
+    local project = graph.project_dir() or context.project_for_buffer()
+    if not project then log.warn "Could not detect dbt project dir" end
+    return project
+end
+
 local function graph_actions(items, direction, project)
     picker.select({ items = items, prompt = "Select " .. direction .. " model" }, function(item)
         if not item then return end
@@ -52,11 +58,8 @@ end
 graph_picker = function(direction)
     local model = context.require_model_buffer()
     if not model then return end
-    local project = graph.project_dir() or context.project_for_buffer()
-    if not project then
-        log.warn "Could not detect dbt project dir"
-        return
-    end
+    local project = require_project()
+    if not project then return end
     graph.load(project, function(index, err)
         if err then
             log.warn "Graph cache unavailable, falling back to dbt ls"
@@ -89,11 +92,8 @@ M.select_downstream = function() graph_picker "downstream" end
 M.select_family = function() graph_picker "family" end
 
 function M.goto_model()
-    local project = graph.project_dir() or context.project_for_buffer()
-    if not project then
-        log.warn "Could not detect dbt project dir"
-        return
-    end
+    local project = require_project()
+    if not project then return end
     local ref = graph.parse_model_ref(vim.api.nvim_get_current_line())
     if not ref then
         log.warn "No ref() or source() call on the current line"
@@ -120,11 +120,8 @@ function M.goto_model()
 end
 
 function M.refresh_graph()
-    local project = graph.project_dir() or context.project_for_buffer()
-    if not project then
-        log.warn "Could not detect dbt project dir"
-        return
-    end
+    local project = require_project()
+    if not project then return end
     graph.refresh(project, function(_, err)
         if err then
             log.error(err)
