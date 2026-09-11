@@ -12,10 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: panvimdoc
-        uses: kdheepak/panvimdoc@main
+        uses: kdheepak/panvimdoc@v4.0.1
         with:
           vimdoc: dbtpal
-      - uses: stefanzweifel/git-auto-commit-action@v5
+      - uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "Auto generate vimdoc"
           branch: ${{ github.head_ref || github.ref_name }}
