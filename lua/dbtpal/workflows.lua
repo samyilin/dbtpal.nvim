@@ -5,61 +5,82 @@ local selectors = require "dbtpal.selectors"
 local picker = require "dbtpal.picker"
 local log = require "dbtpal.log"
 local display = require "dbtpal.display"
-local config = require "dbtpal.config"
 local context = require "dbtpal.context"
 
 local M = {}
 
-local function graph_picker(direction)
+local graph_picker
+
+local function graph_actions(items, direction, project)
+    picker.select({ items = items, prompt = "Select " .. direction .. " model" }, function(item)
+        if not item then return end
+        vim.ui.select({ "open", "run", "test", "compile", "build", "refresh" }, {
+            prompt = item.name .. " action",
+        }, function(action)
+            if not action then return end
+            if action == "refresh" then return graph_picker(direction) end
+            if action == "open" then
+                vim.cmd.edit(vim.fs.joinpath(project, item.path))
+                return
+            end
+            vim.ui.select({ "Notify only", "Open full output" }, {
+                prompt = "Show dbt output?",
+            }, function(output_mode)
+                if not output_mode then return end
+                execute.run(action, { "--select", item.name }, function(result)
+                    if result.code ~= 0 then
+                        log.error(result.stderr ~= "" and result.stderr or result.stdout)
+                    elseif output_mode == "Open full output" then
+                        display.popup(vim.split(result.stdout, "\n", { trimempty = true }))
+                    end
+                end)
+            end)
+        end)
+    end)
+end
+
+local function filter_graph_items(items, model)
+    return vim.tbl_filter(
+        function(item)
+            return item.name ~= model
+                and (item.resource_type == "model" or item.resource_type == "seed" or item.resource_type == "snapshot")
+        end,
+        items
+    )
+end
+
+graph_picker = function(direction)
     local model = context.require_model_buffer()
     if not model then return end
-    local selector = require("dbtpal.selectors")[direction](model)
-    resources.list({ selector = selector }, function(items, err)
+    local project = graph.project_dir() or context.project_for_buffer()
+    if not project then
+        log.warn "Could not detect dbt project dir"
+        return
+    end
+    graph.load(project, function(index, err)
         if err then
-            log.error(err.stderr ~= "" and err.stderr or "Unable to list dbt models")
+            log.warn "Graph cache unavailable, falling back to dbt ls"
+            local selector = selectors[direction](model)
+            resources.list({ selector = selector }, function(items, list_err)
+                if list_err then
+                    log.error(list_err.stderr ~= "" and list_err.stderr or "Unable to list dbt models")
+                    return
+                end
+                items = filter_graph_items(items, model)
+                if #items == 0 then
+                    log.info("No " .. direction .. " models found for " .. model)
+                    return
+                end
+                graph_actions(items, direction, project)
+            end)
             return
         end
-        items = vim.tbl_filter(
-            function(item)
-                return item.name ~= model
-                    and (
-                        item.resource_type == "model"
-                        or item.resource_type == "seed"
-                        or item.resource_type == "snapshot"
-                    )
-            end,
-            items
-        )
+        local items = filter_graph_items(graph[direction](index, model), model)
         if #items == 0 then
             log.info("No " .. direction .. " models found for " .. model)
             return
         end
-        picker.select({ items = items, prompt = "Select " .. direction .. " model" }, function(item)
-            if not item then return end
-            vim.ui.select({ "open", "run", "test", "compile", "build", "refresh" }, {
-                prompt = item.name .. " action",
-            }, function(action)
-                if not action then return end
-                if action == "refresh" then return graph_picker(direction) end
-                if action == "open" then
-                    local root = config.options.path_to_dbt_project
-                    vim.cmd.edit(vim.fs.joinpath(root, item.path))
-                    return
-                end
-                vim.ui.select({ "Notify only", "Open full output" }, {
-                    prompt = "Show dbt output?",
-                }, function(output_mode)
-                    if not output_mode then return end
-                    execute.run(action, { "--select", item.name }, function(result)
-                        if result.code ~= 0 then
-                            log.error(result.stderr ~= "" and result.stderr or result.stdout)
-                        elseif output_mode == "Open full output" then
-                            display.popup(vim.split(result.stdout, "\n", { trimempty = true }))
-                        end
-                    end)
-                end)
-            end)
-        end)
+        graph_actions(items, direction, project)
     end)
 end
 

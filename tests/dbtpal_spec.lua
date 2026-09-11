@@ -82,6 +82,8 @@ it("indexes graph nodes and walks lineage", function()
     assert.are.equal(2, #down)
     assert.are.equal("stg", down[1].name)
     assert.are.equal("final", down[2].name)
+    local family = graph.family(index, "stg")
+    assert.are.equal(2, #family)
     assert.are.equal("models/stg.sql", index.by_name["stg"][1].path)
 end)
 

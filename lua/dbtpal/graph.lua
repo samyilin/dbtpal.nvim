@@ -92,6 +92,24 @@ function M.upstream(index, name) return walk(index, { name }, "upstream") end
 
 function M.downstream(index, name) return walk(index, { name }, "downstream") end
 
+function M.family(index, name)
+    local seen = {}
+    local out = {}
+    for _, entry in ipairs(M.upstream(index, name)) do
+        if not seen[entry.unique_id] then
+            seen[entry.unique_id] = true
+            out[#out + 1] = entry
+        end
+    end
+    for _, entry in ipairs(M.downstream(index, name)) do
+        if not seen[entry.unique_id] then
+            seen[entry.unique_id] = true
+            out[#out + 1] = entry
+        end
+    end
+    return out
+end
+
 ---Parse a ref() or source() call on a line. Returns nil when absent.
 ---@return table|nil { kind = "ref"|"source", name = string }
 function M.parse_model_ref(line)
