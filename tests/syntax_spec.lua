@@ -20,13 +20,13 @@ end
 local function has_at(line, text, group)
     local col = vim.fn.getline(line):find(text, 1, true)
     assert(col, "missing text: " .. text)
-    assert.True(vim.tbl_contains(groups(line, col), group), line .. ":" .. text .. " should have " .. group)
+    check_true(vim.tbl_contains(groups(line, col), group), line .. ":" .. text .. " should have " .. group)
 end
 
 local function absent_at(line, text, group)
     local col = vim.fn.getline(line):find(text, 1, true)
     assert(col, "missing text: " .. text)
-    assert.True(not vim.tbl_contains(groups(line, col), group), line .. ":" .. text .. " should not have " .. group)
+    check_true(not vim.tbl_contains(groups(line, col), group), line .. ":" .. text .. " should not have " .. group)
 end
 
 it("highlights SQL keywords outside templates", function()

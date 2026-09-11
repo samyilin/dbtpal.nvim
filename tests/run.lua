@@ -13,8 +13,20 @@ local assertions = {
         end
     end,
 }
-assertions.True = function(value, message) lua_assert(value, message or "expected a truthy value") end
-assertions.are = assertions
+local function check_equal(expected, actual, message)
+    if expected ~= actual then
+        error(message or ("expected " .. vim.inspect(expected) .. ", got " .. vim.inspect(actual)), 2)
+    end
+end
+local function check_same(expected, actual, message)
+    if not vim.deep_equal(expected, actual) then
+        error(message or ("expected " .. vim.inspect(expected) .. ", got " .. vim.inspect(actual)), 2)
+    end
+end
+local function check_true(value, message) lua_assert(value, message or "expected a truthy value") end
+_G.check_equal = check_equal
+_G.check_same = check_same
+_G.check_true = check_true
 setmetatable(assertions, { __call = function(_, ...) return lua_assert(...) end })
 _G.assert = assertions
 

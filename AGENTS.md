@@ -23,19 +23,25 @@
 - `selene.toml` chains `lua51` with a checked-in `neovim.toml` stub that
   declares `vim` and test globals as `any`. This silences
   `undefined_variable` for Neovim/test APIs, nothing more.
-- A strict generated standard was attempted and **reverted**: on Selene
-  0.31.0, standard-library shape enforcement is dead. Verified probes:
-  unknown deep fields (`vim.nope`, `string.nope`), wrong argument types
-  (`table.insert("nope")`), missing required args (`table.insert()`,
-  `vim.api.nvim_buf_set_lines()`), and even `deprecated` entries all
-  produce zero diagnostics. Only top-level `undefined_variable` and
-  `must_use` fire.
-- Do NOT retry a strict generated standard until Selene fixes
-  `incorrect_standard_library_use` enforcement. If retried, the design
-  stands: generate from `vim.fn.api_info()` of the pinned
-  minimum-version binary (0.12.5 tarballs exist for CI), keep the
-  standard pinned to the minimum (not the dev binary), and gate
-  freshness via a CI regenerate-and-diff job.
-- The minimum version lives in two places that must move together:
-  `plugin/dbtpal.lua` (runtime gate) and `README.md` (docs).
-- LuaLS (not Selene) is the type/API checker for this repo.
+- CORRECTION: an earlier claim that enforcement was dead was wrong. The
+  cause was our own `incorrect_standard_library_use = "allow"` entry,
+  which silently disabled all shape checking. With the lint enabled and
+  a generated `neovim.yml`, enforcement is verified live (e.g. bogus
+  `vim.api` names fail). Never allow that lint.
+- The generator must run under the **pinned minimum-version binary**
+  (currently 0.12.5; release tarballs exist for CI), never the dev
+  binary, so newer-only API usage fails lint instead of becoming a
+  user-facing runtime bug.
+- Bumping the minimum is a ritual: fetch the new pinned binary,
+  regenerate, commit the YAML, update the `plugin/dbtpal.lua` runtime
+  gate and `README.md`. CI regenerates and fails on diff.
+- Known Selene quirks baked into the generator: dotted overlay keys
+  cannot extend lua51's function-typed `assert`, so the harness uses
+  `check_equal`/`check_same`/`check_true` globals instead;
+  `vim.cmd`, `vim.fn`, `vim.uv`, `vim.lsp` are wildcard-`any` (too
+  dynamic to enumerate); all `vim.api` args are optional (metadata
+  lacks optionality markers, and required args false-positive valid
+  calls).
+- The minimum version lives in three places that must move together:
+  `plugin/dbtpal.lua` (runtime gate), the Selene standard (lint gate),
+  and `README.md` (docs). LuaLS remains the type checker.

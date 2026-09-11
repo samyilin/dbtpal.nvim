@@ -2,5 +2,4 @@ std = "lua51+neovim"
 
 [lints]
 global_usage = "allow"
-incorrect_standard_library_use = "allow"
 multiple_statements = "allow"
