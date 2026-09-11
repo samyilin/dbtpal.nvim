@@ -97,6 +97,18 @@ it("parses ref and source calls", function()
     assert(graph.parse_model_ref "select 1" == nil)
 end)
 
+it("resolves model names from yaml buffers", function()
+    local context = require "dbtpal.context"
+    local buf = vim.api.nvim_create_buf(true, false)
+    vim.api.nvim_set_current_buf(buf)
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "models:", "  - name: orders" })
+    vim.bo[buf].filetype = "yaml"
+    vim.api.nvim_win_set_cursor(0, { 2, 11 })
+    assert.are.equal("orders", context.current_model())
+    vim.bo[buf].filetype = "lua"
+    assert(context.current_model() == nil)
+end)
+
 it("finds the dbt project directory", function()
     assert(projects.detect_dbt_project_dir "tests/dbt_project/models/example")
     assert.are.equal(vim.fn.getcwd() .. "/tests/dbt_project", require("dbtpal.config").options.path_to_dbt_project)

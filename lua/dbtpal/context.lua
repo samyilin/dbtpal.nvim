@@ -5,9 +5,16 @@ local M = {}
 
 function M.current_model()
     local filetype = vim.bo.filetype
-    if vim.bo.buftype ~= "" or (filetype ~= "sql" and filetype ~= "dbt" and filetype ~= "csv") then return nil end
-    local name = vim.fn.expand "%:t:r"
-    return name ~= "" and name or nil
+    if vim.bo.buftype ~= "" then return nil end
+    if filetype == "sql" or filetype == "dbt" or filetype == "csv" then
+        local name = vim.fn.expand "%:t:r"
+        return name ~= "" and name or nil
+    end
+    if filetype == "yaml" or filetype == "yml" then
+        local word = vim.fn.expand "<cword>"
+        return word ~= "" and word or nil
+    end
+    return nil
 end
 
 function M.require_model_buffer()
