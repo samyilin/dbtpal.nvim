@@ -7,8 +7,9 @@ if exists("b:current_syntax")
     finish
 endif
 
-" Import default SQL syntax
-runtime! syntax/sql.vim
+" Base SQL syntax, owned by the user's config (e.g. dotfiles set
+" g:dbtpal_sql_base = "sqlbigquery"); stock sql.vim otherwise.
+execute "runtime! syntax/" . get(g:, "dbtpal_sql_base", "sql") . ".vim"
 
 " sqlFold uses contains=ALL, which lets Jinja keywords shadow SQL keywords
 " outside {{ }} blocks. Redefine it with the Jinja keyword groups excluded;
