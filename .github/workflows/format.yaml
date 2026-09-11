@@ -7,9 +7,9 @@ jobs:
     name: Stylua
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: JohnnyMorganz/stylua-action@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          version: 0.16.1
+          version: v2.5.2
           args: --check .
