@@ -87,6 +87,33 @@ it("indexes graph nodes and walks lineage", function()
     assert.are.equal("models/stg.sql", index.by_name["stg"][1].path)
 end)
 
+it("resolves sources by dataset", function()
+    local index = graph.build_index {
+        ["source.proj.billing.orders"] = {
+            name = "orders",
+            resource_type = "source",
+            source_name = "billing",
+            original_file_path = "models/sources.yml",
+            depends_on = { nodes = {} },
+        },
+        ["source.proj.shop.orders"] = {
+            name = "orders",
+            resource_type = "source",
+            source_name = "shop",
+            original_file_path = "models/sources.yml",
+            depends_on = { nodes = {} },
+        },
+    }
+    local entry, alternatives = graph.resolve(index, "orders", "shop")
+    assert.are.equal("shop", entry.source_name)
+    assert.are.equal(1, alternatives)
+    local fallback = graph.resolve(index, "orders")
+    assert(fallback ~= nil)
+    local missing, no_alternatives = graph.resolve(index, "missing")
+    assert(missing == nil)
+    assert.are.equal(0, no_alternatives)
+end)
+
 it("parses ref and source calls", function()
     local ref = graph.parse_model_ref "select * from {{ ref('orders') }}"
     assert.are.equal("ref", ref.kind)

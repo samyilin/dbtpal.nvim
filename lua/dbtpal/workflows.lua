@@ -45,12 +45,11 @@ local function graph_actions(items, direction, project)
     end)
 end
 
+local graph_resource_types = { model = true, seed = true, snapshot = true, source = true }
+
 local function filter_graph_items(items, model)
     return vim.tbl_filter(
-        function(item)
-            return item.name ~= model
-                and (item.resource_type == "model" or item.resource_type == "seed" or item.resource_type == "snapshot")
-        end,
+        function(item) return item.name ~= model and graph_resource_types[item.resource_type] end,
         items
     )
 end
@@ -104,13 +103,12 @@ function M.goto_model()
             log.error(err)
             return
         end
-        local entries = index.by_name[ref.name] or {}
-        if #entries == 0 then
+        local entry, alternatives = graph.resolve(index, ref.name, ref.source)
+        if not entry then
             log.warn("Unknown model: " .. ref.name)
             return
         end
-        if #entries > 1 then log.info("Multiple matches for " .. ref.name .. "; opening the first") end
-        local entry = entries[1]
+        if alternatives > 0 then log.info("Multiple matches for " .. ref.name .. "; opening the best match") end
         if not entry.path then
             log.warn("No file path for " .. ref.name)
             return

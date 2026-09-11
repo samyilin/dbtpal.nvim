@@ -157,13 +157,13 @@ existing relations; `compile` only renders SQL.
 :DbtSelectFamily
 ```
 
-These query dbt for related models, seeds, and snapshots (excluding the
-current model), then let you `open`, `run`, `test`, `compile`, `build`, or
-`refresh` the selection. Execution also offers `Notify only` or
-`Open full output`. The graph pickers work from model (SQL/dbt) buffers as
-well as seed (CSV) buffers. From YAML files (schema, sources, exposures),
-the word under the cursor is used as the model name, so place the cursor
-on the model or source name first.
+These query the cached graph for related models, seeds, snapshots, and
+sources (excluding the current model), then let you `open`, `run`, `test`,
+`compile`, `build`, or `refresh` the selection. Execution also offers
+`Notify only` or `Open full output`. The graph pickers work from model
+(SQL/dbt) buffers as well as seed (CSV) buffers. From YAML files (schema,
+sources, exposures), the word under the cursor is used as the model name,
+so place the cursor on the model or source name first.
 
 ### DbtGotoModel, DbtRefreshGraph
 
@@ -180,8 +180,9 @@ vim.keymap.set("n", "gd", "<cmd>DbtGotoModel<cr>")
 
 Resolution uses a cached dependency graph built from the project's
 `target/manifest.json` (falling back to `dbt ls`), so jumps are instant
-and exact across packages, seeds, and snapshots. `DbtRefreshGraph`
-rebuilds the cache:
+and exact across packages, seeds, snapshots, and sources. When several
+sources share a table name, the `source('dataset', 'table')` dataset
+selects the right one. `DbtRefreshGraph` rebuilds the cache:
 
 ```vim
 :DbtRefreshGraph

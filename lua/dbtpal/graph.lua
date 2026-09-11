@@ -27,6 +27,7 @@ function M.build_index(nodes)
             name = node.name,
             resource_type = node.resource_type,
             package_name = node.package_name,
+            source_name = node.source_name,
             path = node.original_file_path or node.path,
             deps = (node.depends_on and node.depends_on.nodes) or {},
         }
@@ -92,6 +93,19 @@ function M.upstream(index, name) return walk(index, { name }, "upstream") end
 
 function M.downstream(index, name) return walk(index, { name }, "downstream") end
 
+---Resolve a name to index entries, preferring a matching source dataset.
+---@return table entry, integer alternatives
+function M.resolve(index, name, source)
+    local entries = index.by_name[name] or {}
+    if #entries == 0 then return nil, 0 end
+    if source then
+        for _, entry in ipairs(entries) do
+            if entry.source_name == source then return entry, #entries - 1 end
+        end
+    end
+    return entries[1], #entries - 1
+end
+
 function M.family(index, name)
     local seen = {}
     local out = {}
@@ -129,6 +143,7 @@ local function write_cache(project_dir, index, manifest_mtime)
             name = entry.name,
             resource_type = entry.resource_type,
             package_name = entry.package_name,
+            source_name = entry.source_name,
             original_file_path = entry.path,
             depends_on = { nodes = entry.deps },
         }
