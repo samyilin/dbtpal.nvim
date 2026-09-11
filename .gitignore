@@ -1,5 +1,4 @@
 /plugin/reload.vim
 db
-.luarc.json
 *.log
 doc/tags

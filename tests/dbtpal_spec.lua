@@ -1,3 +1,4 @@
+---@diagnostic disable: need-check-nil
 local commands = require "dbtpal.commands"
 local graph = require "dbtpal.graph"
 local projects = require "dbtpal.projects"

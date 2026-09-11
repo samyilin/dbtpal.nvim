@@ -10,3 +10,9 @@ repos:
         entry: selene
         language: system
         types: [lua]
+      - id: lua-language-server
+        name: Lua Language Server
+        entry: lua-language-server --check
+        language: system
+        types: [lua]
+        pass_filenames: false

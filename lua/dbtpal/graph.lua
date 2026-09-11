@@ -94,7 +94,7 @@ function M.upstream(index, name) return walk(index, { name }, "upstream") end
 function M.downstream(index, name) return walk(index, { name }, "downstream") end
 
 ---Resolve a name to index entries, preferring a matching source dataset.
----@return table entry, integer alternatives
+---@return table|nil entry, integer alternatives
 function M.resolve(index, name, source)
     local entries = index.by_name[name] or {}
     if #entries == 0 then return nil, 0 end
