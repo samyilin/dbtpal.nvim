@@ -1,0 +1,23 @@
+name: selene-std
+
+# The Selene standard is pinned to the minimum supported Neovim version.
+# Bump NVIM_VERSION together with plugin/dbtpal.lua and README.md.
+env:
+  NVIM_VERSION: v0.12.5
+
+on: [push, pull_request]
+
+jobs:
+  std:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned Neovim
+        run: |
+          curl -L -o nvim.tar.gz \
+            "https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/nvim-linux-x86_64.tar.gz"
+          tar xzf nvim.tar.gz
+      - name: Regenerate standard
+        run: ./nvim-linux-x86_64/bin/nvim --headless -u NONE -l scripts/generate-selene-std.lua neovim.yml
+      - name: Fail on drift
+        run: git diff --exit-code neovim.yml
