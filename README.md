@@ -170,8 +170,11 @@ where the walk started (e.g. `↑ raw (+1)`).
 (`step into`, `open`, `run`, `test`, `compile`, `build`) for the current
 item instead. The prompt shows the breadcrumb trail, `Esc` exits the
 whole walk, and the dependency-free picker (which has no action key)
-keeps the two-phase menu. Everything resolves from the graph cache, so
-stepping is instant.
+keeps the two-phase menu. The action menu also offers `tag`/`untag` to
+collect models across steps; the `★ tagged (n)` entry reviews the
+collection and operates on all of them at once (`open all` opens each in
+its own buffer, the rest run one combined `--select`). Everything
+resolves from the graph cache, so stepping is instant.
 
 ### DbtGotoModel, DbtRefreshGraph
 

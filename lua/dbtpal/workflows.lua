@@ -52,20 +52,47 @@ end
 
 local function walk_format(item)
     if item.back then return item.name end
-    local label = (item.direction == "up" and "↑ " or "↓ ") .. item.name
+    local label = item.name
+    if item.direction ~= nil then label = (item.direction == "up" and "↑ " or "↓ ") .. label end
     if item.dist ~= nil then label = label .. " (+" .. item.dist .. ")" end
     return label
 end
 
-local function walk_act(project, index, item, center, trail, dist)
+---Toggle an entry in the tagged set. Returns true when now tagged.
+function M.toggle_tag(tagged, entry)
+    local key = entry.unique_id or entry.name
+    for i, existing in ipairs(tagged) do
+        if (existing.unique_id or existing.name) == key then
+            table.remove(tagged, i)
+            return false
+        end
+    end
+    tagged[#tagged + 1] = entry
+    return true
+end
+
+function M.is_tagged(tagged, entry)
+    local key = entry.unique_id or entry.name
+    for _, existing in ipairs(tagged) do
+        if (existing.unique_id or existing.name) == key then return true end
+    end
+    return false
+end
+
+local function walk_act(project, index, item, center, trail, dist, tagged)
     local entry = item
-    vim.ui.select({ "step into", "open", "run", "test", "compile", "build" }, {
+    local tag_label = M.is_tagged(tagged, item) and "untag" or "tag"
+    vim.ui.select({ "step into", tag_label, "open", "run", "test", "compile", "build" }, {
         prompt = item.name .. " action",
     }, function(action)
         if not action then return end
         if action == "step into" then
             trail[#trail + 1] = center
-            walk_loop(project, index, item.name, trail, dist)
+            walk_loop(project, index, item.name, trail, dist, tagged)
+            return
+        end
+        if action == "tag" or action == "untag" then
+            M.toggle_tag(tagged, item)
             return
         end
         if action == "open" then
@@ -91,19 +118,77 @@ local function walk_act(project, index, item, center, trail, dist)
     end)
 end
 
-walk_loop = function(project, index, center, trail, dist)
+local tagged_operate
+
+local function tagged_submenu(project, index, center, trail, dist, tagged)
+    local choices = { { operate_all = true, name = "● operate on all (" .. #tagged .. ")" } }
+    for _, entry in ipairs(tagged) do
+        choices[#choices + 1] = entry
+    end
+    picker.select({ items = choices, prompt = "Tagged", format_item = walk_format }, function(item)
+        if not item then
+            walk_loop(project, index, center, trail, dist, tagged)
+            return
+        end
+        if item.operate_all then
+            tagged_operate(project, tagged)
+            return
+        end
+        walk_act(project, index, item, center, trail, dist, tagged)
+    end)
+end
+
+tagged_operate = function(project, tagged)
+    if #tagged == 0 then return end
+    vim.ui.select({ "open all", "run", "test", "compile", "build" }, {
+        prompt = "Operation for " .. #tagged .. " tagged models",
+    }, function(operation)
+        if not operation then return end
+        if operation == "open all" then
+            for i, entry in ipairs(tagged) do
+                if entry.path then
+                    if i == 1 then
+                        vim.cmd.edit(vim.fs.joinpath(project, entry.path))
+                    else
+                        vim.cmd.badd(vim.fs.joinpath(project, entry.path))
+                    end
+                end
+            end
+            return
+        end
+        vim.ui.select({ "Notify only", "Open full output" }, {
+            prompt = "Show dbt output?",
+        }, function(output_mode)
+            if not output_mode then return end
+            local names = {}
+            for _, entry in ipairs(tagged) do
+                names[#names + 1] = entry.name
+            end
+            execute.run(operation, { "--select", table.concat(names, " ") }, function(result)
+                if result.code ~= 0 then
+                    log.error(result.stderr ~= "" and result.stderr or result.stdout)
+                elseif output_mode == "Open full output" then
+                    display.popup(vim.split(result.stdout, "\n", { trimempty = true }))
+                end
+            end)
+        end)
+    end)
+end
+
+walk_loop = function(project, index, center, trail, dist, tagged)
     local neighbors = M.walk_neighbors(index, center)
     for _, item in ipairs(neighbors) do
         item.dist = dist[item.unique_id]
     end
-    if #neighbors == 0 then
+    if #neighbors == 0 and #tagged == 0 then
         log.info(center .. " has no further neighbours")
         local entries = index.by_name[center] or {}
-        walk_act(project, index, entries[1] or { name = center }, center, trail, dist)
+        walk_act(project, index, entries[1] or { name = center }, center, trail, dist, tagged)
         return
     end
     local choices = {}
     if #trail > 0 then choices[#choices + 1] = { back = true, name = ".. back to " .. trail[#trail] } end
+    if #tagged > 0 then choices[#choices + 1] = { tagged = true, name = "★ tagged (" .. #tagged .. ")" } end
     vim.list_extend(choices, neighbors)
     local backend = picker.get()
     local crumbs = {}
@@ -117,11 +202,15 @@ walk_loop = function(project, index, center, trail, dist)
     local function step_into(item)
         if item.back then
             local prev = table.remove(trail)
-            walk_loop(project, index, prev, trail, dist)
+            walk_loop(project, index, prev, trail, dist, tagged)
+            return
+        end
+        if item.tagged then
+            tagged_submenu(project, index, center, trail, dist, tagged)
             return
         end
         trail[#trail + 1] = center
-        walk_loop(project, index, item.name, trail, dist)
+        walk_loop(project, index, item.name, trail, dist, tagged)
     end
     if backend.action_key then
         picker.select({
@@ -129,8 +218,8 @@ walk_loop = function(project, index, center, trail, dist)
             prompt = prompt .. " [" .. backend.action_key .. " actions]",
             format_item = walk_format,
             on_action = function(item)
-                if item.back then return end
-                walk_act(project, index, item, center, trail, dist)
+                if item.back or item.tagged then return end
+                walk_act(project, index, item, center, trail, dist, tagged)
             end,
         }, function(item)
             if not item then return end
@@ -141,10 +230,14 @@ walk_loop = function(project, index, center, trail, dist)
             if not item then return end
             if item.back then
                 local prev = table.remove(trail)
-                walk_loop(project, index, prev, trail, dist)
+                walk_loop(project, index, prev, trail, dist, tagged)
                 return
             end
-            walk_act(project, index, item, center, trail, dist)
+            if item.tagged then
+                tagged_submenu(project, index, center, trail, dist, tagged)
+                return
+            end
+            walk_act(project, index, item, center, trail, dist, tagged)
         end)
     end
 end
@@ -161,7 +254,7 @@ local function walk_begin(name)
             log.warn(name .. " is not a known model")
             return
         end
-        walk_loop(project, index, name, {}, graph.distances(index, name))
+        walk_loop(project, index, name, {}, graph.distances(index, name), {})
     end)
 end
 

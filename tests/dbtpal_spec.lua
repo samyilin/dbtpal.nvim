@@ -184,6 +184,16 @@ it("compresses breadcrumb trails", function()
     check_equal(false, kept)
 end)
 
+it("toggles tagged models", function()
+    local workflows = require "dbtpal.workflows"
+    local tagged = {}
+    check_equal(true, workflows.toggle_tag(tagged, { unique_id = "model.p.a", name = "a" }))
+    check_equal(true, workflows.is_tagged(tagged, { unique_id = "model.p.a", name = "a" }))
+    check_equal(false, workflows.toggle_tag(tagged, { unique_id = "model.p.a", name = "a" }))
+    check_equal(false, workflows.is_tagged(tagged, { unique_id = "model.p.a", name = "a" }))
+    check_equal(0, #tagged)
+end)
+
 it("parses ref and source calls", function()
     local ref = graph.parse_model_ref "select * from {{ ref('orders') }}"
     check_equal("ref", ref.kind)
