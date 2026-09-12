@@ -106,6 +106,40 @@ function M.resolve(index, name, source)
     return entries[1], #entries - 1
 end
 
+---Shortest-path distances from origin over undirected edges.
+---@return table map of unique_id -> distance
+function M.distances(index, origin)
+    local dist = {}
+    local queue = {}
+    for _, entry in ipairs(index.by_name[origin] or {}) do
+        if dist[entry.unique_id] == nil then
+            dist[entry.unique_id] = 0
+            queue[#queue + 1] = entry.unique_id
+        end
+    end
+    local dependents = {}
+    for id, entry in pairs(index.nodes) do
+        for _, dep in ipairs(entry.deps) do
+            dependents[dep] = dependents[dep] or {}
+            dependents[dep][#dependents[dep] + 1] = id
+        end
+    end
+    while #queue > 0 do
+        local id = table.remove(queue, 1)
+        local entry = index.nodes[id]
+        local next_ids = {}
+        if entry then vim.list_extend(next_ids, entry.deps) end
+        vim.list_extend(next_ids, dependents[id] or {})
+        for _, next_id in ipairs(next_ids) do
+            if index.nodes[next_id] and dist[next_id] == nil then
+                dist[next_id] = dist[id] + 1
+                queue[#queue + 1] = next_id
+            end
+        end
+    end
+    return dist
+end
+
 function M.family(index, name)
     local seen = {}
     local out = {}

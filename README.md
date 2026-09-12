@@ -177,12 +177,14 @@ the picker until you reach your target:
 
 With no argument, the current buffer's model is the starting point (or a
 model picker when outside a model buffer). Each step lists upstream (`↑`)
-and downstream (`↓`) neighbours plus `.. back`. `Enter` steps into the
-neighbour directly; `<C-o>` opens the action menu (`step into`, `open`,
-`run`, `test`, `compile`, `build`) for the current item instead. The
-prompt breadcrumb counts your steps, `Esc` exits the whole walk, and the
-dependency-free picker (which has no action key) keeps the two-phase
-menu. Everything resolves from the graph cache, so stepping is instant.
+and downstream (`↓`) neighbours plus `.. back`, each annotated with its
+shortest-path distance from where the walk started (e.g. `↑ raw (+1)`).
+`Enter` steps into the neighbour directly; `<C-o>` opens the action menu
+(`step into`, `open`, `run`, `test`, `compile`, `build`) for the current
+item instead. The prompt shows the breadcrumb trail, `Esc` exits the
+whole walk, and the dependency-free picker (which has no action key)
+keeps the two-phase menu. Everything resolves from the graph cache, so
+stepping is instant.
 
 ### DbtGotoModel, DbtRefreshGraph
 

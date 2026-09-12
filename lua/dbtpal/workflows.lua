@@ -117,7 +117,9 @@ end
 
 local function walk_format(item)
     if item.back then return item.name end
-    return (item.direction == "up" and "↑ " or "↓ ") .. item.name
+    local label = (item.direction == "up" and "↑ " or "↓ ") .. item.name
+    if item.dist ~= nil then label = label .. " (+" .. item.dist .. ")" end
+    return label
 end
 
 local function walk_act(project, index, item, center, trail)
@@ -156,6 +158,11 @@ end
 
 walk_loop = function(project, index, center, trail)
     local neighbors = M.walk_neighbors(index, center)
+    local origin = trail[1] or center
+    local dist = graph.distances(index, origin)
+    for _, item in ipairs(neighbors) do
+        item.dist = dist[item.unique_id]
+    end
     if #neighbors == 0 then
         log.info(center .. " has no further neighbours")
         local entries = index.by_name[center] or {}

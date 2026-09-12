@@ -145,6 +145,33 @@ it("labels walk neighbors by direction", function()
     check_equal("final", neighbors[2].name)
 end)
 
+it("measures undirected distances from an origin", function()
+    local index = graph.build_index {
+        ["seed.proj.raw"] = {
+            name = "raw",
+            resource_type = "seed",
+            original_file_path = "seeds/raw.csv",
+            depends_on = { nodes = {} },
+        },
+        ["model.proj.stg"] = {
+            name = "stg",
+            resource_type = "model",
+            original_file_path = "models/stg.sql",
+            depends_on = { nodes = { "seed.proj.raw" } },
+        },
+        ["model.proj.final"] = {
+            name = "final",
+            resource_type = "model",
+            original_file_path = "models/final.sql",
+            depends_on = { nodes = { "model.proj.stg" } },
+        },
+    }
+    local dist = graph.distances(index, "stg")
+    check_equal(0, dist["model.proj.stg"])
+    check_equal(1, dist["seed.proj.raw"])
+    check_equal(1, dist["model.proj.final"])
+end)
+
 it("parses ref and source calls", function()
     local ref = graph.parse_model_ref "select * from {{ ref('orders') }}"
     check_equal("ref", ref.kind)
