@@ -149,22 +149,6 @@ The selected models are passed to dbt as one `--select` argument using
 resource names. `run` and `build` can modify the database; `test` tests
 existing relations; `compile` only renders SQL.
 
-### DbtSelectUpstream, DbtSelectDownstream, DbtSelectFamily
-
-```vim
-:DbtSelectUpstream
-:DbtSelectDownstream
-:DbtSelectFamily
-```
-
-These query the cached graph for related models, seeds, snapshots, and
-sources (excluding the current model), then let you `open`, `run`, `test`,
-`compile`, `build`, or `refresh` the selection. Execution also offers
-`Notify only` or `Open full output`. The graph pickers work from model
-(SQL/dbt) buffers as well as seed (CSV) buffers. From YAML files (schema,
-sources, exposures), the word under the cursor is used as the model name,
-so place the cursor on the model or source name first.
-
 ### DbtWalk
 
 `DbtWalk` walks the dependency graph one step at a time, staying inside
@@ -176,9 +160,12 @@ the picker until you reach your target:
 ```
 
 With no argument, the current buffer's model is the starting point (or a
-model picker when outside a model buffer). Each step lists upstream (`↑`)
-and downstream (`↓`) neighbours plus `.. back`, each annotated with its
-shortest-path distance from where the walk started (e.g. `↑ raw (+1)`).
+model picker when outside a model buffer). The walk works from model
+(SQL/dbt) and seed (CSV) buffers, plus YAML files (schema, sources,
+exposures) via the word under the cursor. Each step lists upstream (`↑`)
+and downstream (`↓`) neighbours — models, seeds, snapshots, and sources
+— plus `.. back`, each annotated with its shortest-path distance from
+where the walk started (e.g. `↑ raw (+1)`).
 `Enter` steps into the neighbour directly; `<C-o>` opens the action menu
 (`step into`, `open`, `run`, `test`, `compile`, `build`) for the current
 item instead. The prompt shows the breadcrumb trail, `Esc` exits the

@@ -29,9 +29,6 @@ M.execute = execute.run
 M.list_resources = resources.list
 M.picker = picker
 M.select_models = workflows.select_models
-M.select_upstream = workflows.select_upstream
-M.select_downstream = workflows.select_downstream
-M.select_family = workflows.select_family
 M.goto_model = workflows.goto_model
 M.refresh_graph = workflows.refresh_graph
 M.walk = workflows.walk
@@ -58,9 +55,6 @@ vim.api.nvim_create_user_command("Dbt", function(cmd)
 end, { nargs = "*", bang = true })
 
 vim.api.nvim_create_user_command("DbtSelectModels", function() workflows.select_models() end, { nargs = 0 })
-vim.api.nvim_create_user_command("DbtSelectUpstream", function() workflows.select_upstream() end, { nargs = 0 })
-vim.api.nvim_create_user_command("DbtSelectDownstream", function() workflows.select_downstream() end, { nargs = 0 })
-vim.api.nvim_create_user_command("DbtSelectFamily", function() workflows.select_family() end, { nargs = 0 })
 vim.api.nvim_create_user_command("DbtGotoModel", function() workflows.goto_model() end, { nargs = 0 })
 vim.api.nvim_create_user_command("DbtRefreshGraph", function() workflows.refresh_graph() end, { nargs = 0 })
 vim.api.nvim_create_user_command("DbtWalk", function(cmd) workflows.walk(cmd.args) end, { nargs = "?" })
