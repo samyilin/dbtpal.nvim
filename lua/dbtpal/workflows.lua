@@ -93,6 +93,7 @@ local function walk_act(project, index, item, center, trail, dist, tagged)
         end
         if action == "tag" or action == "untag" then
             M.toggle_tag(tagged, item)
+            walk_loop(project, index, center, trail, dist, tagged)
             return
         end
         if action == "open" then
