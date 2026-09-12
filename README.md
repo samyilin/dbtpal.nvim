@@ -178,15 +178,12 @@ resolves from the graph cache, so stepping is instant.
 
 ### DbtGotoModel, DbtRefreshGraph
 
-`DbtGotoModel` jumps to the model referenced by the `ref()` or
-`source()` call on the current line:
-
-```vim
-:DbtGotoModel
-```
+`goto_model()` jumps to the model referenced by the `ref()` or
+`source()` call on the current line. It is Lua-only by design — bind it
+to a key rather than typing a command:
 
 ```lua
-vim.keymap.set("n", "gd", "<cmd>DbtGotoModel<cr>")
+vim.keymap.set("n", "gd", function() require("dbtpal").goto_model() end)
 ```
 
 Resolution uses a cached dependency graph built from the project's

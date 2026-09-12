@@ -55,7 +55,7 @@ vim.api.nvim_create_user_command("Dbt", function(cmd)
 end, { nargs = "*", bang = true })
 
 vim.api.nvim_create_user_command("DbtSelectModels", function() workflows.select_models() end, { nargs = 0 })
-vim.api.nvim_create_user_command("DbtGotoModel", function() workflows.goto_model() end, { nargs = 0 })
+
 vim.api.nvim_create_user_command("DbtRefreshGraph", function() workflows.refresh_graph() end, { nargs = 0 })
 vim.api.nvim_create_user_command("DbtWalk", function(cmd) workflows.walk(cmd.args) end, { nargs = "?" })
 
