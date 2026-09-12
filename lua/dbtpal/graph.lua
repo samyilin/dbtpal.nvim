@@ -140,6 +140,35 @@ function M.distances(index, origin)
     return dist
 end
 
+---Collapse cycles and cap length for breadcrumb display. Display-only;
+---the real back-stack is untouched.
+---@return table crumbs, boolean truncated
+function M.compress_trail(names, max)
+    local out = {}
+    for _, name in ipairs(names) do
+        local pos = nil
+        for i, existing in ipairs(out) do
+            if existing == name then
+                pos = i
+                break
+            end
+        end
+        if pos then
+            while #out > pos do
+                table.remove(out)
+            end
+        else
+            out[#out + 1] = name
+        end
+    end
+    local truncated = false
+    while #out > max do
+        table.remove(out, 1)
+        truncated = true
+    end
+    return out, truncated
+end
+
 function M.family(index, name)
     local seen = {}
     local out = {}

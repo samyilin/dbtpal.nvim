@@ -174,12 +174,13 @@ walk_loop = function(project, index, center, trail)
     vim.list_extend(choices, neighbors)
     local backend = picker.get()
     local crumbs = {}
-    for _, name in ipairs(vim.list_extend(vim.deepcopy(trail), { center })) do
+    local compressed, truncated = graph.compress_trail(vim.list_extend(vim.deepcopy(trail), { center }), 3)
+    for _, name in ipairs(compressed) do
         local entries = index.by_name[name] or {}
         local d = entries[1] and dist[entries[1].unique_id] or nil
         crumbs[#crumbs + 1] = d == nil and name or (name .. " (+" .. d .. ")")
     end
-    local prompt = table.concat(crumbs, " > ")
+    local prompt = (truncated and "... > " or "") .. table.concat(crumbs, " > ")
     local function step_into(item)
         if item.back then
             local prev = table.remove(trail)

@@ -172,6 +172,18 @@ it("measures undirected distances from an origin", function()
     check_equal(1, dist["model.proj.final"])
 end)
 
+it("compresses breadcrumb trails", function()
+    local crumbs, truncated = graph.compress_trail({ "a", "b", "a" }, 3)
+    check_same({ "a" }, crumbs)
+    check_equal(false, truncated)
+    local long, cut = graph.compress_trail({ "a", "b", "c", "d" }, 3)
+    check_same({ "b", "c", "d" }, long)
+    check_equal(true, cut)
+    local short, kept = graph.compress_trail({ "a", "b" }, 3)
+    check_same({ "a", "b" }, short)
+    check_equal(false, kept)
+end)
+
 it("parses ref and source calls", function()
     local ref = graph.parse_model_ref "select * from {{ ref('orders') }}"
     check_equal("ref", ref.kind)
