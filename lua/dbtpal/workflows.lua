@@ -272,9 +272,28 @@ function M.walk(start)
     end
     local project = require_project()
     if not project then return end
-    resources.list({ resource_type = "model" }, function(items, err)
+    graph.load(project, function(index, err)
         if err then
-            log.error(err.stderr ~= "" and err.stderr or "Unable to list dbt models")
+            log.warn "Graph cache unavailable, falling back to dbt ls"
+            resources.list({ resource_type = "model" }, function(items, list_err)
+                if list_err then
+                    log.error(list_err.stderr ~= "" and list_err.stderr or "Unable to list dbt models")
+                    return
+                end
+                picker.select({ items = items, prompt = "Walk from" }, function(item)
+                    if not item then return end
+                    walk_begin(item.name)
+                end)
+            end)
+            return
+        end
+        local items = {}
+        for _, entry in pairs(index.nodes) do
+            if entry.resource_type == "model" then items[#items + 1] = entry end
+        end
+        table.sort(items, function(a, b) return a.name < b.name end)
+        if #items == 0 then
+            log.warn "No models in graph cache"
             return
         end
         picker.select({ items = items, prompt = "Walk from" }, function(item)
