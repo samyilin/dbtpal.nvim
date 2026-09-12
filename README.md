@@ -203,12 +203,10 @@ require("dbtpal").setup({ ... })
 require("dbtpal").run_command("run", { "--select", "orders" })
 require("dbtpal").list_resources({ resource_type = "model" }, callback)
 require("dbtpal").select_models()
-require("dbtpal").select_upstream()
-require("dbtpal").select_downstream()
-require("dbtpal").select_family()
+require("dbtpal").walk()
+require("dbtpal").walk("orders")
 require("dbtpal").goto_model()
 require("dbtpal").refresh_graph()
-require("dbtpal").walk()
 ```
 
 Arguments are structured Lua lists only, never shell strings:
