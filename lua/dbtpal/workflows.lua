@@ -79,8 +79,25 @@ function M.is_tagged(tagged, entry)
     return false
 end
 
+local function execute_with_output(operation, select_value, on_cancel)
+    vim.ui.select({ "Notify only", "Open full output" }, {
+        prompt = "Show dbt output?",
+    }, function(output_mode)
+        if not output_mode then
+            if on_cancel then on_cancel() end
+            return
+        end
+        execute.run(operation, { "--select", select_value }, function(result)
+            if result.code ~= 0 then
+                log.error(result.stderr ~= "" and result.stderr or result.stdout)
+            elseif output_mode == "Open full output" then
+                display.popup(vim.split(result.stdout, "\n", { trimempty = true }))
+            end
+        end)
+    end)
+end
+
 local function walk_act(project, index, item, center, trail, dist, tagged)
-    local entry = item
     local tag_label = M.is_tagged(tagged, item) and "untag" or "tag"
     vim.ui.select({ "step into", tag_label, "open", "run", "test", "compile", "build" }, {
         prompt = item.name .. " action",
@@ -97,25 +114,14 @@ local function walk_act(project, index, item, center, trail, dist, tagged)
             return
         end
         if action == "open" then
-            if not entry.path then
+            if not item.path then
                 log.warn("No file path for " .. item.name)
                 return
             end
-            vim.cmd.edit(vim.fs.joinpath(project, entry.path))
+            vim.cmd.edit(vim.fs.joinpath(project, item.path))
             return
         end
-        vim.ui.select({ "Notify only", "Open full output" }, {
-            prompt = "Show dbt output?",
-        }, function(output_mode)
-            if not output_mode then return end
-            execute.run(action, { "--select", item.name }, function(result)
-                if result.code ~= 0 then
-                    log.error(result.stderr ~= "" and result.stderr or result.stdout)
-                elseif output_mode == "Open full output" then
-                    display.popup(vim.split(result.stdout, "\n", { trimempty = true }))
-                end
-            end)
-        end)
+        execute_with_output(action, item.name)
     end)
 end
 
@@ -132,47 +138,42 @@ local function tagged_submenu(project, index, center, trail, dist, tagged)
             return
         end
         if item.operate_all then
-            tagged_operate(project, tagged)
+            tagged_operate(project, tagged, function() tagged_submenu(project, index, center, trail, dist, tagged) end)
             return
         end
         walk_act(project, index, item, center, trail, dist, tagged)
     end)
 end
 
-tagged_operate = function(project, tagged)
+tagged_operate = function(project, tagged, on_cancel)
     if #tagged == 0 then return end
     vim.ui.select({ "open all", "run", "test", "compile", "build" }, {
         prompt = "Operation for " .. #tagged .. " tagged models",
     }, function(operation)
-        if not operation then return end
+        if not operation then
+            if on_cancel then on_cancel() end
+            return
+        end
         if operation == "open all" then
-            for i, entry in ipairs(tagged) do
+            local opened = 0
+            for _, entry in ipairs(tagged) do
                 if entry.path then
-                    if i == 1 then
+                    opened = opened + 1
+                    if opened == 1 then
                         vim.cmd.edit(vim.fs.joinpath(project, entry.path))
                     else
                         vim.cmd.badd(vim.fs.joinpath(project, entry.path))
                     end
                 end
             end
+            if opened == 0 then log.warn "No tagged models have file paths" end
             return
         end
-        vim.ui.select({ "Notify only", "Open full output" }, {
-            prompt = "Show dbt output?",
-        }, function(output_mode)
-            if not output_mode then return end
-            local names = {}
-            for _, entry in ipairs(tagged) do
-                names[#names + 1] = entry.name
-            end
-            execute.run(operation, { "--select", table.concat(names, " ") }, function(result)
-                if result.code ~= 0 then
-                    log.error(result.stderr ~= "" and result.stderr or result.stdout)
-                elseif output_mode == "Open full output" then
-                    display.popup(vim.split(result.stdout, "\n", { trimempty = true }))
-                end
-            end)
-        end)
+        local names = {}
+        for _, entry in ipairs(tagged) do
+            names[#names + 1] = entry.name
+        end
+        execute_with_output(operation, table.concat(names, " "), on_cancel)
     end)
 end
 
@@ -335,21 +336,8 @@ function M.select_models()
                 { prompt = "Select dbt operation" },
                 function(operation)
                     if not operation then return end
-                    vim.ui.select(
-                        { "Notify only", "Open full output" },
-                        { prompt = "Show dbt output?" },
-                        function(output_mode)
-                            if not output_mode then return end
-                            local selected_ids = selectors.from_resources(selected)
-                            execute.run(operation, { "--select", table.concat(selected_ids, " ") }, function(result)
-                                if result.code ~= 0 then
-                                    log.error(result.stderr ~= "" and result.stderr or result.stdout)
-                                elseif output_mode == "Open full output" then
-                                    display.popup(vim.split(result.stdout, "\n", { trimempty = true }))
-                                end
-                            end)
-                        end
-                    )
+                    local selected_ids = selectors.from_resources(selected)
+                    execute_with_output(operation, table.concat(selected_ids, " "))
                 end
             )
         end)
