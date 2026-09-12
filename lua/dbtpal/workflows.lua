@@ -1,5 +1,6 @@
 local execute = require "dbtpal.execute"
 local graph = require "dbtpal.graph"
+local graph_cache = require "dbtpal.graph_cache"
 local resources = require "dbtpal.resources"
 local selectors = require "dbtpal.selectors"
 local picker = require "dbtpal.picker"
@@ -12,7 +13,7 @@ local M = {}
 local walk_loop
 
 local function require_project()
-    local project = graph.project_dir() or context.project_for_buffer()
+    local project = graph_cache.project_dir() or context.project_for_buffer()
     if not project then log.warn "Could not detect dbt project dir" end
     return project
 end
@@ -20,7 +21,7 @@ end
 ---List models from the graph cache, falling back to live dbt ls.
 ---Calls back with (items, err).
 local function list_models(project, callback)
-    graph.load(project, function(index, err)
+    graph_cache.load(project, function(index, err)
         if err then
             resources.list({ resource_type = "model" }, function(items, list_err)
                 if list_err then
@@ -265,7 +266,7 @@ end
 local function walk_begin(name)
     local project = require_project()
     if not project then return end
-    graph.load(project, function(index, err)
+    graph_cache.load(project, function(index, err)
         if err then
             log.error(err)
             return
@@ -314,7 +315,7 @@ function M.goto_model()
         log.warn "No ref() or source() call on the current line"
         return
     end
-    graph.load(project, function(index, err)
+    graph_cache.load(project, function(index, err)
         if err then
             log.error(err)
             return
@@ -336,7 +337,7 @@ end
 function M.refresh_graph()
     local project = require_project()
     if not project then return end
-    graph.refresh(project, function(_, err)
+    graph_cache.refresh(project, function(_, err)
         if err then
             log.error(err)
         else
