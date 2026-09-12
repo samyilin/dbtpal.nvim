@@ -166,7 +166,8 @@ walk_loop = function(project, index, center, trail)
     if #trail > 0 then choices[#choices + 1] = { back = true, name = ".. back to " .. trail[#trail] } end
     vim.list_extend(choices, neighbors)
     local backend = picker.get()
-    local prompt = center .. " (" .. #trail .. " steps)"
+    local crumbs = vim.list_extend(vim.deepcopy(trail), { center })
+    local prompt = table.concat(crumbs, " > ")
     local function step_into(item)
         if item.back then
             local prev = table.remove(trail)
