@@ -122,7 +122,7 @@ local function walk_format(item)
     return label
 end
 
-local function walk_act(project, index, item, center, trail)
+local function walk_act(project, index, item, center, trail, dist)
     local entry = item
     vim.ui.select({ "step into", "open", "run", "test", "compile", "build" }, {
         prompt = item.name .. " action",
@@ -130,7 +130,7 @@ local function walk_act(project, index, item, center, trail)
         if not action then return end
         if action == "step into" then
             trail[#trail + 1] = center
-            walk_loop(project, index, item.name, trail)
+            walk_loop(project, index, item.name, trail, dist)
             return
         end
         if action == "open" then
@@ -156,17 +156,15 @@ local function walk_act(project, index, item, center, trail)
     end)
 end
 
-walk_loop = function(project, index, center, trail)
+walk_loop = function(project, index, center, trail, dist)
     local neighbors = M.walk_neighbors(index, center)
-    local origin = trail[1] or center
-    local dist = graph.distances(index, origin)
     for _, item in ipairs(neighbors) do
         item.dist = dist[item.unique_id]
     end
     if #neighbors == 0 then
         log.info(center .. " has no further neighbours")
         local entries = index.by_name[center] or {}
-        walk_act(project, index, entries[1] or { name = center }, center, trail)
+        walk_act(project, index, entries[1] or { name = center }, center, trail, dist)
         return
     end
     local choices = {}
@@ -184,11 +182,11 @@ walk_loop = function(project, index, center, trail)
     local function step_into(item)
         if item.back then
             local prev = table.remove(trail)
-            walk_loop(project, index, prev, trail)
+            walk_loop(project, index, prev, trail, dist)
             return
         end
         trail[#trail + 1] = center
-        walk_loop(project, index, item.name, trail)
+        walk_loop(project, index, item.name, trail, dist)
     end
     if backend.action_key then
         picker.select({
@@ -197,7 +195,7 @@ walk_loop = function(project, index, center, trail)
             format_item = walk_format,
             on_action = function(item)
                 if item.back then return end
-                walk_act(project, index, item, center, trail)
+                walk_act(project, index, item, center, trail, dist)
             end,
         }, function(item)
             if not item then return end
@@ -208,10 +206,10 @@ walk_loop = function(project, index, center, trail)
             if not item then return end
             if item.back then
                 local prev = table.remove(trail)
-                walk_loop(project, index, prev, trail)
+                walk_loop(project, index, prev, trail, dist)
                 return
             end
-            walk_act(project, index, item, center, trail)
+            walk_act(project, index, item, center, trail, dist)
         end)
     end
 end
@@ -228,7 +226,7 @@ local function walk_begin(name)
             log.warn(name .. " is not a known model")
             return
         end
-        walk_loop(project, index, name, {})
+        walk_loop(project, index, name, {}, graph.distances(index, name))
     end)
 end
 

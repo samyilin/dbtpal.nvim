@@ -20,7 +20,7 @@ end
 ---@param nodes table map of unique_id -> node table
 ---@return table index { by_name = {}, nodes = {} }
 function M.build_index(nodes)
-    local index = { by_name = {}, nodes = {} }
+    local index = { by_name = {}, nodes = {}, dependents = {} }
     for unique_id, node in pairs(nodes or {}) do
         local entry = {
             unique_id = unique_id,
@@ -37,6 +37,12 @@ function M.build_index(nodes)
             index.by_name[entry.name][#index.by_name[entry.name] + 1] = entry
         end
     end
+    for id, entry in pairs(index.nodes) do
+        for _, dep in ipairs(entry.deps) do
+            index.dependents[dep] = index.dependents[dep] or {}
+            index.dependents[dep][#index.dependents[dep] + 1] = id
+        end
+    end
     return index
 end
 
@@ -51,18 +57,13 @@ local function walk(index, names, direction)
             end
         end
     end
+    local out = {}
+    local head = 1
     if direction == "downstream" then
-        local dependents = {}
-        for id, entry in pairs(index.nodes) do
-            for _, dep in ipairs(entry.deps) do
-                dependents[dep] = dependents[dep] or {}
-                dependents[dep][#dependents[dep] + 1] = id
-            end
-        end
-        local out = {}
-        while #queue > 0 do
-            local id = table.remove(queue, 1)
-            for _, next_id in ipairs(dependents[id] or {}) do
+        while head <= #queue do
+            local id = queue[head]
+            head = head + 1
+            for _, next_id in ipairs(index.dependents[id] or {}) do
                 if not seen[next_id] then
                     seen[next_id] = true
                     queue[#queue + 1] = next_id
@@ -72,9 +73,9 @@ local function walk(index, names, direction)
         end
         return out
     end
-    local out = {}
-    while #queue > 0 do
-        local id = table.remove(queue, 1)
+    while head <= #queue do
+        local id = queue[head]
+        head = head + 1
         local entry = index.nodes[id]
         if entry then
             for _, dep_id in ipairs(entry.deps) do
@@ -117,19 +118,14 @@ function M.distances(index, origin)
             queue[#queue + 1] = entry.unique_id
         end
     end
-    local dependents = {}
-    for id, entry in pairs(index.nodes) do
-        for _, dep in ipairs(entry.deps) do
-            dependents[dep] = dependents[dep] or {}
-            dependents[dep][#dependents[dep] + 1] = id
-        end
-    end
-    while #queue > 0 do
-        local id = table.remove(queue, 1)
+    local head = 1
+    while head <= #queue do
+        local id = queue[head]
+        head = head + 1
         local entry = index.nodes[id]
         local next_ids = {}
         if entry then vim.list_extend(next_ids, entry.deps) end
-        vim.list_extend(next_ids, dependents[id] or {})
+        vim.list_extend(next_ids, index.dependents[id] or {})
         for _, next_id in ipairs(next_ids) do
             if index.nodes[next_id] and dist[next_id] == nil then
                 dist[next_id] = dist[id] + 1
