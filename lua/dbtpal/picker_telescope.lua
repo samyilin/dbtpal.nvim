@@ -7,6 +7,7 @@ function M.setup(picker)
     local conf = require("telescope.config").values
 
     picker.register("telescope", {
+        action_key = "<C-o>",
         select = function(opts, callback)
             pickers
                 .new(opts, {
@@ -30,6 +31,15 @@ function M.setup(picker)
                             actions.close(prompt_bufnr)
                             callback(selection and selection.value or nil)
                         end)
+                        if opts.on_action then
+                            map("i", "<C-o>", function()
+                                local selection = state.get_selected_entry()
+                                actions.close(prompt_bufnr)
+                                if selection and selection.value then
+                                    vim.schedule(function() opts.on_action(selection.value) end)
+                                end
+                            end)
+                        end
                         return true
                     end,
                 })

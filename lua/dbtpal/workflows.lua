@@ -165,9 +165,32 @@ walk_loop = function(project, index, center, trail)
     local choices = {}
     if #trail > 0 then choices[#choices + 1] = { back = true, name = ".. back to " .. trail[#trail] } end
     vim.list_extend(choices, neighbors)
-    picker.select(
-        { items = choices, prompt = center .. " (" .. #trail .. " steps)", format_item = walk_format },
-        function(item)
+    local backend = picker.get()
+    local prompt = center .. " (" .. #trail .. " steps)"
+    local function step_into(item)
+        if item.back then
+            local prev = table.remove(trail)
+            walk_loop(project, index, prev, trail)
+            return
+        end
+        trail[#trail + 1] = center
+        walk_loop(project, index, item.name, trail)
+    end
+    if backend.action_key then
+        picker.select({
+            items = choices,
+            prompt = prompt .. " [" .. backend.action_key .. " actions]",
+            format_item = walk_format,
+            on_action = function(item)
+                if item.back then return end
+                walk_act(project, index, item, center, trail)
+            end,
+        }, function(item)
+            if not item then return end
+            step_into(item)
+        end)
+    else
+        picker.select({ items = choices, prompt = prompt, format_item = walk_format }, function(item)
             if not item then return end
             if item.back then
                 local prev = table.remove(trail)
@@ -175,8 +198,8 @@ walk_loop = function(project, index, center, trail)
                 return
             end
             walk_act(project, index, item, center, trail)
-        end
-    )
+        end)
+    end
 end
 
 local function walk_begin(name)
