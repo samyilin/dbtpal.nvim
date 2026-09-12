@@ -94,6 +94,16 @@ function M.upstream(index, name) return walk(index, { name }, "upstream") end
 
 function M.downstream(index, name) return walk(index, { name }, "downstream") end
 
+---All models in the index, sorted by name.
+function M.models(index)
+    local items = {}
+    for _, entry in pairs(index.nodes) do
+        if entry.resource_type == "model" then items[#items + 1] = entry end
+    end
+    table.sort(items, function(a, b) return a.name < b.name end)
+    return items
+end
+
 ---Resolve a name to index entries, preferring a matching source dataset.
 ---@return table|nil entry, integer alternatives
 function M.resolve(index, name, source)

@@ -194,6 +194,33 @@ it("toggles tagged models", function()
     check_equal(0, #tagged)
 end)
 
+it("lists models sorted by name", function()
+    local index = graph.build_index {
+        ["model.proj.zebra"] = {
+            name = "zebra",
+            resource_type = "model",
+            original_file_path = "models/zebra.sql",
+            depends_on = { nodes = {} },
+        },
+        ["model.proj.apple"] = {
+            name = "apple",
+            resource_type = "model",
+            original_file_path = "models/apple.sql",
+            depends_on = { nodes = {} },
+        },
+        ["seed.proj.raw"] = {
+            name = "raw",
+            resource_type = "seed",
+            original_file_path = "seeds/raw.csv",
+            depends_on = { nodes = {} },
+        },
+    }
+    local models = graph.models(index)
+    check_equal(2, #models)
+    check_equal("apple", models[1].name)
+    check_equal("zebra", models[2].name)
+end)
+
 it("parses ref and source calls", function()
     local ref = graph.parse_model_ref "select * from {{ ref('orders') }}"
     check_equal("ref", ref.kind)

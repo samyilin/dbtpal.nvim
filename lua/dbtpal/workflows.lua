@@ -17,6 +17,24 @@ local function require_project()
     return project
 end
 
+---List models from the graph cache, falling back to live dbt ls.
+---Calls back with (items, err).
+local function list_models(project, callback)
+    graph.load(project, function(index, err)
+        if err then
+            resources.list({ resource_type = "model" }, function(items, list_err)
+                if list_err then
+                    callback(nil, list_err.stderr ~= "" and list_err.stderr or "Unable to list dbt models")
+                    return
+                end
+                callback(items, nil)
+            end)
+            return
+        end
+        callback(graph.models(index), nil)
+    end)
+end
+
 local graph_resource_types = { model = true, seed = true, snapshot = true, source = true }
 
 local function filter_graph_items(items, model)
@@ -272,28 +290,13 @@ function M.walk(start)
     end
     local project = require_project()
     if not project then return end
-    graph.load(project, function(index, err)
+    list_models(project, function(items, err)
         if err then
-            log.warn "Graph cache unavailable, falling back to dbt ls"
-            resources.list({ resource_type = "model" }, function(items, list_err)
-                if list_err then
-                    log.error(list_err.stderr ~= "" and list_err.stderr or "Unable to list dbt models")
-                    return
-                end
-                picker.select({ items = items, prompt = "Walk from" }, function(item)
-                    if not item then return end
-                    walk_begin(item.name)
-                end)
-            end)
+            log.error(err)
             return
         end
-        local items = {}
-        for _, entry in pairs(index.nodes) do
-            if entry.resource_type == "model" then items[#items + 1] = entry end
-        end
-        table.sort(items, function(a, b) return a.name < b.name end)
         if #items == 0 then
-            log.warn "No models in graph cache"
+            log.warn "No models found"
             return
         end
         picker.select({ items = items, prompt = "Walk from" }, function(item)
@@ -343,9 +346,11 @@ function M.refresh_graph()
 end
 
 function M.select_models()
-    resources.list({ resource_type = "model" }, function(items, err)
+    local project = require_project()
+    if not project then return end
+    list_models(project, function(items, err)
         if err then
-            log.error(err.stderr ~= "" and err.stderr or "Unable to list dbt models")
+            log.error(err)
             return
         end
         picker.select_many({ items = items, prompt = "Select dbt models" }, function(selected)
