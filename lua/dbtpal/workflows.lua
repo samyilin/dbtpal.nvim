@@ -173,7 +173,12 @@ walk_loop = function(project, index, center, trail)
     if #trail > 0 then choices[#choices + 1] = { back = true, name = ".. back to " .. trail[#trail] } end
     vim.list_extend(choices, neighbors)
     local backend = picker.get()
-    local crumbs = vim.list_extend(vim.deepcopy(trail), { center })
+    local crumbs = {}
+    for _, name in ipairs(vim.list_extend(vim.deepcopy(trail), { center })) do
+        local entries = index.by_name[name] or {}
+        local d = entries[1] and dist[entries[1].unique_id] or nil
+        crumbs[#crumbs + 1] = d == nil and name or (name .. " (+" .. d .. ")")
+    end
     local prompt = table.concat(crumbs, " > ")
     local function step_into(item)
         if item.back then
