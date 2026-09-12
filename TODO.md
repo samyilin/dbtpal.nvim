@@ -1,5 +1,11 @@
 # TODO
 
+- One-way DAG export for web visualization: dump the cached graph (plus
+  metadata: project, dataset/source, tags, resource type, file path) as
+  JSON alongside a self-contained D3 HTML page. View-only, no
+  click-back into Neovim (browser-to-editor IPC is fragile and out of
+  scope). Prerequisite: persist node `tags` in the graph cache payload.
+
 - Validate `DbtGotoModel` on `source()` jumps and cross-package models in a
   project that has them (Jaffle Shop has neither).
 - Validate dataset-disambiguated `source()` jumps and source traversal in a
