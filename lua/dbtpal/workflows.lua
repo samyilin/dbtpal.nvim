@@ -10,6 +10,7 @@ local context = require "dbtpal.context"
 local M = {}
 
 local graph_picker
+local walk_loop
 
 local function require_project()
     local project = graph.project_dir() or context.project_for_buffer()
@@ -89,6 +90,134 @@ end
 M.select_upstream = function() graph_picker "upstream" end
 M.select_downstream = function() graph_picker "downstream" end
 M.select_family = function() graph_picker "family" end
+
+---Pure step computation for the picker walk. Returns labeled neighbors.
+function M.walk_neighbors(index, center)
+    local items = {}
+    for _, entry in ipairs(graph.upstream(index, center)) do
+        items[#items + 1] = {
+            direction = "up",
+            name = entry.name,
+            resource_type = entry.resource_type,
+            path = entry.path,
+            unique_id = entry.unique_id,
+        }
+    end
+    for _, entry in ipairs(graph.downstream(index, center)) do
+        items[#items + 1] = {
+            direction = "down",
+            name = entry.name,
+            resource_type = entry.resource_type,
+            path = entry.path,
+            unique_id = entry.unique_id,
+        }
+    end
+    return filter_graph_items(items, center)
+end
+
+local function walk_format(item)
+    if item.back then return item.name end
+    return (item.direction == "up" and "↑ " or "↓ ") .. item.name
+end
+
+local function walk_act(project, index, item, center, trail)
+    local entry = item
+    vim.ui.select({ "step into", "open", "run", "test", "compile", "build" }, {
+        prompt = item.name .. " action",
+    }, function(action)
+        if not action then return end
+        if action == "step into" then
+            trail[#trail + 1] = center
+            walk_loop(project, index, item.name, trail)
+            return
+        end
+        if action == "open" then
+            if not entry.path then
+                log.warn("No file path for " .. item.name)
+                return
+            end
+            vim.cmd.edit(vim.fs.joinpath(project, entry.path))
+            return
+        end
+        vim.ui.select({ "Notify only", "Open full output" }, {
+            prompt = "Show dbt output?",
+        }, function(output_mode)
+            if not output_mode then return end
+            execute.run(action, { "--select", item.name }, function(result)
+                if result.code ~= 0 then
+                    log.error(result.stderr ~= "" and result.stderr or result.stdout)
+                elseif output_mode == "Open full output" then
+                    display.popup(vim.split(result.stdout, "\n", { trimempty = true }))
+                end
+            end)
+        end)
+    end)
+end
+
+walk_loop = function(project, index, center, trail)
+    local neighbors = M.walk_neighbors(index, center)
+    if #neighbors == 0 then
+        log.info(center .. " has no further neighbours")
+        local entries = index.by_name[center] or {}
+        walk_act(project, index, entries[1] or { name = center }, center, trail)
+        return
+    end
+    local choices = {}
+    if #trail > 0 then choices[#choices + 1] = { back = true, name = ".. back to " .. trail[#trail] } end
+    vim.list_extend(choices, neighbors)
+    picker.select(
+        { items = choices, prompt = center .. " (" .. #trail .. " steps)", format_item = walk_format },
+        function(item)
+            if not item then return end
+            if item.back then
+                local prev = table.remove(trail)
+                walk_loop(project, index, prev, trail)
+                return
+            end
+            walk_act(project, index, item, center, trail)
+        end
+    )
+end
+
+local function walk_begin(name)
+    local project = require_project()
+    if not project then return end
+    graph.load(project, function(index, err)
+        if err then
+            log.error(err)
+            return
+        end
+        if not index.by_name[name] then
+            log.warn(name .. " is not a known model")
+            return
+        end
+        walk_loop(project, index, name, {})
+    end)
+end
+
+function M.walk(start)
+    if start and start ~= "" then
+        walk_begin(start)
+        return
+    end
+    local model = context.current_model()
+    if model then
+        walk_begin(model)
+        return
+    end
+    local project = require_project()
+    if not project then return end
+    resources.list({ resource_type = "model" }, function(items, err)
+        if err then
+            log.error(err.stderr ~= "" and err.stderr or "Unable to list dbt models")
+            return
+        end
+        picker.select({ items = items, prompt = "Walk from" }, function(item)
+            if not item then return end
+            walk_begin(item.name)
+        end)
+    end)
+end
 
 function M.goto_model()
     local project = require_project()

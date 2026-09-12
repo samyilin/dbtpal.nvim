@@ -34,6 +34,7 @@ M.select_downstream = workflows.select_downstream
 M.select_family = workflows.select_family
 M.goto_model = workflows.goto_model
 M.refresh_graph = workflows.refresh_graph
+M.walk = workflows.walk
 telescope_picker.setup(picker)
 mini_picker.setup(picker)
 
@@ -62,5 +63,6 @@ vim.api.nvim_create_user_command("DbtSelectDownstream", function() workflows.sel
 vim.api.nvim_create_user_command("DbtSelectFamily", function() workflows.select_family() end, { nargs = 0 })
 vim.api.nvim_create_user_command("DbtGotoModel", function() workflows.goto_model() end, { nargs = 0 })
 vim.api.nvim_create_user_command("DbtRefreshGraph", function() workflows.refresh_graph() end, { nargs = 0 })
+vim.api.nvim_create_user_command("DbtWalk", function(cmd) workflows.walk(cmd.args) end, { nargs = "?" })
 
 return M

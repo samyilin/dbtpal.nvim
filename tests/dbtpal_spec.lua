@@ -115,6 +115,36 @@ it("resolves sources by dataset", function()
     check_equal(0, no_alternatives)
 end)
 
+it("labels walk neighbors by direction", function()
+    local workflows = require "dbtpal.workflows"
+    local index = graph.build_index {
+        ["seed.proj.raw"] = {
+            name = "raw",
+            resource_type = "seed",
+            original_file_path = "seeds/raw.csv",
+            depends_on = { nodes = {} },
+        },
+        ["model.proj.stg"] = {
+            name = "stg",
+            resource_type = "model",
+            original_file_path = "models/stg.sql",
+            depends_on = { nodes = { "seed.proj.raw" } },
+        },
+        ["model.proj.final"] = {
+            name = "final",
+            resource_type = "model",
+            original_file_path = "models/final.sql",
+            depends_on = { nodes = { "model.proj.stg" } },
+        },
+    }
+    local neighbors = workflows.walk_neighbors(index, "stg")
+    check_equal(2, #neighbors)
+    check_equal("up", neighbors[1].direction)
+    check_equal("raw", neighbors[1].name)
+    check_equal("down", neighbors[2].direction)
+    check_equal("final", neighbors[2].name)
+end)
+
 it("parses ref and source calls", function()
     local ref = graph.parse_model_ref "select * from {{ ref('orders') }}"
     check_equal("ref", ref.kind)

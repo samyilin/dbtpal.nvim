@@ -165,6 +165,24 @@ sources (excluding the current model), then let you `open`, `run`, `test`,
 sources, exposures), the word under the cursor is used as the model name,
 so place the cursor on the model or source name first.
 
+### DbtWalk
+
+`DbtWalk` walks the dependency graph one step at a time, staying inside
+the picker until you reach your target:
+
+```vim
+:DbtWalk
+:DbtWalk orders
+```
+
+With no argument, the current buffer's model is the starting point (or a
+model picker when outside a model buffer). Each step lists upstream (`↑`)
+and downstream (`↓`) neighbours plus `.. back`. Picking a neighbour
+offers `step into`, `open`, `run`, `test`, `compile`, or `build`;
+`step into` moves the walk there, the prompt breadcrumb counts your
+steps, and `Esc` exits the whole walk. Everything resolves from the
+graph cache, so stepping is instant.
+
 ### DbtGotoModel, DbtRefreshGraph
 
 `DbtGotoModel` jumps to the model referenced by the `ref()` or
@@ -200,6 +218,7 @@ require("dbtpal").select_downstream()
 require("dbtpal").select_family()
 require("dbtpal").goto_model()
 require("dbtpal").refresh_graph()
+require("dbtpal").walk()
 ```
 
 Arguments are structured Lua lists only, never shell strings:
