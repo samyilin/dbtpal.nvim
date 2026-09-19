@@ -16,7 +16,17 @@ local M = {}
 
 local function has_selector(args)
     for _, arg in ipairs(args or {}) do
-        if arg == "--select" or arg == "-s" then return true end
+        if
+            arg == "--select"
+            or arg:match "^%-%-select="
+            or arg == "--selector"
+            or arg:match "^%-%-selector="
+            or arg == "--models"
+            or arg:match "^%-%-models="
+            or arg:match "^%-[sm]"
+        then
+            return true
+        end
     end
     return false
 end
@@ -51,7 +61,7 @@ vim.api.nvim_create_user_command("Dbt", function(cmd)
         if not model then return end
         vim.list_extend(args, { "--select", model })
     end
-    main.run_command(command, args, cmd.bang == 1 and "float" or nil)
+    main.run_command(command, args, cmd.bang and "float" or nil)
 end, { nargs = "*", bang = true })
 
 vim.api.nvim_create_user_command("DbtSelectModels", function() workflows.select_models() end, { nargs = 0 })

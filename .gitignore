@@ -2,3 +2,4 @@
 db
 *.log
 doc/tags
+demo/generated/

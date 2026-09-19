@@ -1719,11 +1719,27 @@ globals:
     args:
       - type: ...
         required: false
+  vim.tbl_extend:
+    args:
+      - type: ...
+        required: false
   vim.tbl_filter:
     args:
       - type: ...
         required: false
   vim.tbl_map:
+    args:
+      - type: ...
+        required: false
+  vim.tbl_values:
+    args:
+      - type: ...
+        required: false
+  vim.tbl_keys:
+    args:
+      - type: ...
+        required: false
+  vim.wait:
     args:
       - type: ...
         required: false
@@ -1754,6 +1770,8 @@ globals:
   vim.env:
     any: true
   vim.opt:
+    any: true
+  vim.opt_local:
     any: true
   vim.log:
     any: true

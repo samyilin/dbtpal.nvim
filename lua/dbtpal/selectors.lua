@@ -7,14 +7,25 @@ function M.family(name) return "+" .. name .. "+" end
 function M.tag(name) return "tag:" .. name end
 function M.path(name) return "path:" .. name end
 
+---dbt selectors use qualified names, never artifact unique_id strings.
+function M.from_resource(resource)
+    local selector
+    if resource.resource_type == "source" and resource.source_name then
+        selector = "source:" .. resource.source_name .. "." .. resource.name
+    elseif resource.fqn and #resource.fqn > 0 then
+        selector = "fqn:" .. table.concat(resource.fqn, ".")
+    else
+        selector = resource.name
+    end
+    if resource.package_name then selector = selector .. ",package:" .. resource.package_name end
+    if resource.resource_type then selector = selector .. ",resource_type:" .. resource.resource_type end
+    return selector
+end
+
 function M.from_resources(resources)
     local result = {}
     for _, resource in ipairs(resources or {}) do
-        -- dbt's node `unique_id` (e.g. model.project.name) is an
-        -- artifact identifier, not a valid value for --select.  Selectors
-        -- use the resource name (or an explicitly constructed graph
-        -- selector) instead.
-        result[#result + 1] = resource.name
+        result[#result + 1] = M.from_resource(resource)
     end
     return result
 end

@@ -1,0 +1,5 @@
+version: 2
+
+seeds:
+  - name: raw_regions
+    description: "Region lookup seed"

@@ -1,0 +1,21 @@
+#!/bin/sh
+case "$1" in
+    --version)
+        printf 'Core:\n  - installed: 1.10.2\n'
+        ;;
+    stream)
+        printf 'first\n'
+        read -r reply
+        printf 'second: %s\n' "$reply"
+        printf 'stderr tail' >&2
+        ;;
+    test|build)
+        printf 'stdout progress\n'
+        printf '\033[31mFailure in test not_null_orders (models/properties.yml)\033[0m\n'
+        printf 'stderr details\n' >&2
+        exit 1
+        ;;
+    *)
+        printf 'command completed\n'
+        ;;
+esac

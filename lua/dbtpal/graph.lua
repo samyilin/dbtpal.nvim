@@ -2,10 +2,30 @@
 ---persistence lives in graph_cache.
 local M = {}
 
+---Resource types that participate in navigation and listings.
+M.resource_types = { model = true, seed = true, snapshot = true, source = true }
+
+---@class dbtpal.GraphEntry
+---@field unique_id string
+---@field name string?
+---@field resource_type string?
+---@field package_name string?
+---@field source_name string?
+---@field fqn string[]?
+---@field root_path string?
+---@field path string?
+---@field deps string[]
+
+---@class dbtpal.GraphIndex
+---@field by_name table<string, dbtpal.GraphEntry[]>
+---@field nodes table<string, dbtpal.GraphEntry>
+---@field dependents table<string, string[]>
+---@field layout dbtpal.ProjectLayout?
+
 ---Build a name index and dependency edges from raw manifest-style nodes.
 ---Pure function over data; safe to unit test without dbt.
----@param nodes table map of unique_id -> node table
----@return table index { by_name = {}, nodes = {} }
+---@param nodes table<string, table> map of unique_id -> node table
+---@return dbtpal.GraphIndex index { by_name = {}, nodes = {} }
 function M.build_index(nodes)
     local index = { by_name = {}, nodes = {}, dependents = {} }
     for unique_id, node in pairs(nodes or {}) do
@@ -13,8 +33,10 @@ function M.build_index(nodes)
             unique_id = unique_id,
             name = node.name,
             resource_type = node.resource_type,
-            package_name = node.package_name,
+            package_name = node.package_name or unique_id:match "^[^.]+%.([^.]+)%.",
             source_name = node.source_name,
+            fqn = node.fqn,
+            root_path = node.root_path,
             path = node.original_file_path or node.path,
             deps = (node.depends_on and node.depends_on.nodes) or {},
         }
@@ -33,83 +55,71 @@ function M.build_index(nodes)
     return index
 end
 
-local function walk(index, names, direction)
-    local seen = {}
-    local queue = {}
-    for _, name in ipairs(names) do
-        for _, entry in ipairs(index.by_name[name] or {}) do
-            if not seen[entry.unique_id] then
-                seen[entry.unique_id] = true
-                queue[#queue + 1] = entry.unique_id
-            end
-        end
-    end
-    local out = {}
-    local head = 1
-    if direction == "downstream" then
-        while head <= #queue do
-            local id = queue[head]
-            head = head + 1
-            for _, next_id in ipairs(index.dependents[id] or {}) do
-                if not seen[next_id] then
-                    seen[next_id] = true
-                    queue[#queue + 1] = next_id
-                    out[#out + 1] = index.nodes[next_id]
-                end
-            end
-        end
-        return out
-    end
-    while head <= #queue do
-        local id = queue[head]
-        head = head + 1
-        local entry = index.nodes[id]
-        if entry then
-            for _, dep_id in ipairs(entry.deps) do
-                if not seen[dep_id] and index.nodes[dep_id] then
-                    seen[dep_id] = true
-                    queue[#queue + 1] = dep_id
-                    out[#out + 1] = index.nodes[dep_id]
-                end
-            end
-        end
-    end
-    return out
+---A unique ID resolves exactly; a bare name can have several candidates.
+---@param index dbtpal.GraphIndex
+---@param reference string
+---@return dbtpal.GraphEntry[]
+function M.matches(index, reference)
+    if index.nodes[reference] then return { index.nodes[reference] } end
+    local entries = vim.list_extend({}, index.by_name[reference] or {})
+    table.sort(entries, function(a, b) return a.unique_id < b.unique_id end)
+    return entries
 end
 
-function M.upstream(index, name) return walk(index, { name }, "upstream") end
+---@param entry dbtpal.GraphEntry
+---@return string
+function M.label(entry)
+    local name = entry.name or entry.unique_id or "?"
+    if not entry.unique_id then return name end
+    if entry.source_name then name = entry.source_name .. "." .. name end
+    if entry.package_name then name = entry.package_name .. "." .. name end
+    if entry.resource_type ~= "model" then name = entry.resource_type .. ":" .. name end
+    return name
+end
 
-function M.downstream(index, name) return walk(index, { name }, "downstream") end
+---Only direct dependencies/dependents of one resource, sorted by identity.
+---@param index dbtpal.GraphIndex
+---@param id string
+---@param direction string
+---@return dbtpal.GraphEntry[]
+function M.neighbors(index, id, direction)
+    local entry = index.nodes[id]
+    if not entry then return {} end
+    local ids = direction == "up" and entry.deps or (index.dependents[id] or {})
+    local items, seen = {}, {}
+    for _, next_id in ipairs(ids) do
+        if next_id ~= id and not seen[next_id] and index.nodes[next_id] then
+            items[#items + 1] = index.nodes[next_id]
+            seen[next_id] = true
+        end
+    end
+    table.sort(items, function(a, b) return a.unique_id < b.unique_id end)
+    return items
+end
 
 ---All models in the index, sorted by name.
+---@param index dbtpal.GraphIndex
+---@return dbtpal.GraphEntry[]
 function M.models(index)
     local items = {}
     for _, entry in pairs(index.nodes) do
         if entry.resource_type == "model" then items[#items + 1] = entry end
     end
-    table.sort(items, function(a, b) return a.name < b.name end)
+    table.sort(items, function(a, b)
+        if a.name == b.name then return a.unique_id < b.unique_id end
+        return a.name < b.name
+    end)
     return items
 end
 
----Resolve a name to index entries, preferring a matching source dataset.
----@return table|nil entry, integer alternatives
-function M.resolve(index, name, source)
-    local entries = index.by_name[name] or {}
-    if #entries == 0 then return nil, 0 end
-    if source then
-        for _, entry in ipairs(entries) do
-            if entry.source_name == source then return entry, #entries - 1 end
-        end
-    end
-    return entries[1], #entries - 1
-end
-
 ---Shortest-path distances from origin over undirected edges.
----@return table map of unique_id -> distance
+---@param index dbtpal.GraphIndex
+---@param origin string
+---@return table<string, integer> map of unique_id -> distance
 function M.distances(index, origin)
     local dist = {}
     local queue = {}
-    for _, entry in ipairs(index.by_name[origin] or {}) do
+    for _, entry in ipairs(M.matches(index, origin)) do
         if dist[entry.unique_id] == nil then
             dist[entry.unique_id] = 0
             queue[#queue + 1] = entry.unique_id
@@ -135,7 +145,9 @@ end
 
 ---Collapse cycles and cap length for breadcrumb display. Display-only;
 ---the real back-stack is untouched.
----@return table crumbs, boolean truncated
+---@param names string[]
+---@param max integer
+---@return string[] crumbs, boolean truncated
 function M.compress_trail(names, max)
     local out = {}
     for _, name in ipairs(names) do
@@ -162,27 +174,12 @@ function M.compress_trail(names, max)
     return out, truncated
 end
 
-function M.family(index, name)
-    local seen = {}
-    local out = {}
-    for _, entry in ipairs(M.upstream(index, name)) do
-        if not seen[entry.unique_id] then
-            seen[entry.unique_id] = true
-            out[#out + 1] = entry
-        end
-    end
-    for _, entry in ipairs(M.downstream(index, name)) do
-        if not seen[entry.unique_id] then
-            seen[entry.unique_id] = true
-            out[#out + 1] = entry
-        end
-    end
-    return out
-end
-
 ---Parse a ref() or source() call on a line. Returns nil when absent.
+---@param line string
 ---@return table|nil { kind = "ref"|"source", name = string }
 function M.parse_model_ref(line)
+    local package_name, model = line:match "ref%s*%(%s*['\"]([%w_.-]+)['\"]%s*,%s*['\"]([%w_.-]+)['\"]"
+    if model then return { kind = "ref", name = model, package_name = package_name } end
     local ref = line:match "ref%s*%(%s*['\"]([%w_]+)['\"]"
     if ref then return { kind = "ref", name = ref } end
     local source, name = line:match "source%s*%(%s*['\"]([%w_]+)['\"]%s*,%s*['\"]([%w_]+)['\"]"

@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: billing
+    description: "Billing dataset"
+    tables:
+      - name: orders
+        description: "Raw billing orders"
+        columns:
+          - name: order_id
+      - name: customers
+        description: "Raw billing customers"

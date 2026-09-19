@@ -28,8 +28,7 @@ end
 
 function M.project_for_buffer()
     if config.options.path_to_dbt_project ~= "" then return config.options.path_to_dbt_project end
-    local path = vim.fn.expand "%:p:h"
-    if projects.detect_dbt_project_dir(path) then return config.options.path_to_dbt_project end
+    if projects.detect_dbt_project_dir() then return config.options.path_to_dbt_project end
     return nil
 end
 

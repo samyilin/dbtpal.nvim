@@ -1,0 +1,12 @@
+name: 'demo_project'
+version: '1.0.0'
+config-version: 2
+
+# Mock validation project for dbtpal.nvim. No dbt binary is required:
+# target/manifest.json is a checked-in mock (see demo/README.md).
+profile: 'demo_project'
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+snapshot-paths: ["snapshots"]
+target-path: "target"

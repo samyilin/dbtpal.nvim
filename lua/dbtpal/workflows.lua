@@ -1,16 +1,16 @@
-local execute = require "dbtpal.execute"
 local graph = require "dbtpal.graph"
 local graph_cache = require "dbtpal.graph_cache"
+local main = require "dbtpal.main"
 local resources = require "dbtpal.resources"
 local selectors = require "dbtpal.selectors"
 local picker = require "dbtpal.picker"
 local log = require "dbtpal.log"
-local display = require "dbtpal.display"
 local context = require "dbtpal.context"
+local projects = require "dbtpal.projects"
+local properties = require "dbtpal.properties"
+local goto_nav = require "dbtpal.goto"
 
 local M = {}
-
-local walk_loop
 
 local function require_project()
     local project = graph_cache.project_dir() or context.project_for_buffer()
@@ -32,46 +32,41 @@ local function list_models(project, callback)
             end)
             return
         end
-        callback(graph.models(index), nil)
+        callback(resources.excluding(graph.models(index)), nil)
     end)
 end
 
-local graph_resource_types = { model = true, seed = true, snapshot = true, source = true }
-
-local function filter_graph_items(items, model)
-    return vim.tbl_filter(
-        function(item) return item.name ~= model and graph_resource_types[item.resource_type] end,
-        items
-    )
-end
+local walk_loop
 
 ---Pure step computation for the picker walk. Returns labeled neighbors.
+---Accepts a unique_id or, for compatibility, a bare resource name (which
+---unions the direct neighbors of every match).
 function M.walk_neighbors(index, center)
-    local items = {}
-    for _, entry in ipairs(graph.upstream(index, center)) do
-        items[#items + 1] = {
-            direction = "up",
-            name = entry.name,
-            resource_type = entry.resource_type,
-            path = entry.path,
-            unique_id = entry.unique_id,
-        }
+    local ids = {}
+    if index.nodes[center] then
+        ids = { center }
+    else
+        for _, entry in ipairs(graph.matches(index, center)) do
+            ids[#ids + 1] = entry.unique_id
+        end
     end
-    for _, entry in ipairs(graph.downstream(index, center)) do
-        items[#items + 1] = {
-            direction = "down",
-            name = entry.name,
-            resource_type = entry.resource_type,
-            path = entry.path,
-            unique_id = entry.unique_id,
-        }
+    local items, seen = {}, {}
+    for _, id in ipairs(ids) do
+        for _, direction in ipairs { "up", "down" } do
+            for _, entry in ipairs(graph.neighbors(index, id, direction)) do
+                if graph.resource_types[entry.resource_type] and not seen[entry.unique_id .. direction] then
+                    seen[entry.unique_id .. direction] = true
+                    items[#items + 1] = vim.tbl_extend("force", entry, { direction = direction })
+                end
+            end
+        end
     end
-    return filter_graph_items(items, center)
+    return resources.excluding(items)
 end
 
 local function walk_format(item)
-    if item.back then return item.name end
-    local label = item.name
+    if item.back or item.yml then return item.name end
+    local label = graph.label(item)
     if item.direction ~= nil then label = (item.direction == "up" and "↑ " or "↓ ") .. label end
     if item.dist ~= nil then label = label .. " (+" .. item.dist .. ")" end
     return label
@@ -106,25 +101,25 @@ local function execute_with_output(operation, select_value, on_cancel)
             if on_cancel then on_cancel() end
             return
         end
-        execute.run(operation, { "--select", select_value }, function(result)
-            if result.code ~= 0 then
-                log.error(result.stderr ~= "" and result.stderr or result.stdout)
-            elseif output_mode == "Open full output" then
-                display.popup(vim.split(result.stdout, "\n", { trimempty = true }))
-            end
-        end)
+        main.run_command(
+            operation,
+            { "--select", select_value },
+            output_mode == "Open full output" and "float" or "notify"
+        )
     end)
 end
 
 local function walk_act(project, index, item, center, trail, dist, tagged)
     local tag_label = M.is_tagged(tagged, item) and "untag" or "tag"
-    vim.ui.select({ "step into", tag_label, "open", "run", "test", "compile", "build" }, {
-        prompt = item.name .. " action",
+    local actions = { tag_label, "open", "run", "test", "compile", "build" }
+    if item.unique_id ~= center then table.insert(actions, 1, "step into") end
+    vim.ui.select(actions, {
+        prompt = graph.label(item) .. " action",
     }, function(action)
         if not action then return end
         if action == "step into" then
             trail[#trail + 1] = center
-            walk_loop(project, index, item.name, trail, dist, tagged)
+            walk_loop(project, index, item.unique_id, trail, dist, tagged)
             return
         end
         if action == "tag" or action == "untag" then
@@ -133,14 +128,10 @@ local function walk_act(project, index, item, center, trail, dist, tagged)
             return
         end
         if action == "open" then
-            if not item.path then
-                log.warn("No file path for " .. item.name)
-                return
-            end
-            vim.cmd.edit(vim.fs.joinpath(project, item.path))
+            projects.open_resource(project, item, index.layout)
             return
         end
-        execute_with_output(action, item.name)
+        execute_with_output(action, selectors.from_resource(item))
     end)
 end
 
@@ -157,14 +148,19 @@ local function tagged_submenu(project, index, center, trail, dist, tagged)
             return
         end
         if item.operate_all then
-            tagged_operate(project, tagged, function() tagged_submenu(project, index, center, trail, dist, tagged) end)
+            tagged_operate(
+                project,
+                index,
+                tagged,
+                function() tagged_submenu(project, index, center, trail, dist, tagged) end
+            )
             return
         end
         walk_act(project, index, item, center, trail, dist, tagged)
     end)
 end
 
-tagged_operate = function(project, tagged, on_cancel)
+tagged_operate = function(project, index, tagged, on_cancel)
     if #tagged == 0 then return end
     vim.ui.select({ "open all", "run", "test", "compile", "build" }, {
         prompt = "Operation for " .. #tagged .. " tagged models",
@@ -176,23 +172,14 @@ tagged_operate = function(project, tagged, on_cancel)
         if operation == "open all" then
             local opened = 0
             for _, entry in ipairs(tagged) do
-                if entry.path then
+                if projects.open_resource(project, entry, index.layout, opened > 0 and "badd" or nil) then
                     opened = opened + 1
-                    if opened == 1 then
-                        vim.cmd.edit(vim.fs.joinpath(project, entry.path))
-                    else
-                        vim.cmd.badd(vim.fs.joinpath(project, entry.path))
-                    end
                 end
             end
             if opened == 0 then log.warn "No tagged models have file paths" end
             return
         end
-        local names = {}
-        for _, entry in ipairs(tagged) do
-            names[#names + 1] = entry.name
-        end
-        execute_with_output(operation, table.concat(names, " "), on_cancel)
+        execute_with_output(operation, table.concat(selectors.from_resources(tagged), " "), on_cancel)
     end)
 end
 
@@ -201,26 +188,31 @@ walk_loop = function(project, index, center, trail, dist, tagged)
     for _, item in ipairs(neighbors) do
         item.dist = dist[item.unique_id]
     end
-    if #neighbors == 0 and #tagged == 0 then
-        log.info(center .. " has no further neighbours")
-        local entries = index.by_name[center] or {}
-        walk_act(project, index, entries[1] or { name = center }, center, trail, dist, tagged)
-        return
-    end
+    local isolated = #neighbors == 0 and #tagged == 0 and #trail == 0
+    if isolated then log.info(graph.label(index.nodes[center]) .. " has no further neighbours") end
     local choices = {}
-    if #trail > 0 then choices[#choices + 1] = { back = true, name = ".. back to " .. trail[#trail] } end
+    if #trail > 0 then
+        choices[#choices + 1] = { back = true, name = ".. back to " .. graph.label(index.nodes[trail[#trail]]) }
+    end
     if #tagged > 0 then choices[#choices + 1] = { tagged = true, name = "★ tagged (" .. #tagged .. ")" } end
+    -- The current node's parallel YAML declaration is listed here, never
+    -- for upstream/downstream neighbours: it is an attribute, not an edge.
+    choices[#choices + 1] = { yml = true, name = "· yaml declaration" }
     vim.list_extend(choices, neighbors)
     local backend = picker.get()
     local crumbs = {}
     local compressed, truncated = graph.compress_trail(vim.list_extend(vim.deepcopy(trail), { center }), 3)
-    for _, name in ipairs(compressed) do
-        local entries = index.by_name[name] or {}
-        local d = entries[1] and dist[entries[1].unique_id] or nil
+    for _, id in ipairs(compressed) do
+        local name = graph.label(index.nodes[id])
+        local d = dist[id]
         crumbs[#crumbs + 1] = d == nil and name or (name .. " (+" .. d .. ")")
     end
     local prompt = (truncated and "... > " or "") .. table.concat(crumbs, " > ")
     local function step_into(item)
+        if item.yml then
+            goto_nav.goto_declaration(project, index.nodes[center])
+            return
+        end
         if item.back then
             local prev = table.remove(trail)
             walk_loop(project, index, prev, trail, dist, tagged)
@@ -231,7 +223,12 @@ walk_loop = function(project, index, center, trail, dist, tagged)
             return
         end
         trail[#trail + 1] = center
-        walk_loop(project, index, item.name, trail, dist, tagged)
+        walk_loop(project, index, item.unique_id, trail, dist, tagged)
+    end
+    -- Cancelling on an isolated node falls back to the action menu, the
+    -- previous behaviour for leaves.
+    local function on_cancel()
+        if isolated then walk_act(project, index, index.nodes[center], center, trail, dist, tagged) end
     end
     if backend.action_key then
         picker.select({
@@ -239,16 +236,22 @@ walk_loop = function(project, index, center, trail, dist, tagged)
             prompt = prompt .. " [" .. backend.action_key .. " actions]",
             format_item = walk_format,
             on_action = function(item)
-                if item.back or item.tagged then return end
+                if item.back or item.tagged or item.yml then return end
                 walk_act(project, index, item, center, trail, dist, tagged)
             end,
         }, function(item)
-            if not item then return end
+            if not item then
+                on_cancel()
+                return
+            end
             step_into(item)
         end)
     else
         picker.select({ items = choices, prompt = prompt, format_item = walk_format }, function(item)
-            if not item then return end
+            if not item then
+                on_cancel()
+                return
+            end
             if item.back then
                 local prev = table.remove(trail)
                 walk_loop(project, index, prev, trail, dist, tagged)
@@ -258,12 +261,17 @@ walk_loop = function(project, index, center, trail, dist, tagged)
                 tagged_submenu(project, index, center, trail, dist, tagged)
                 return
             end
+            if item.yml then
+                step_into(item)
+                return
+            end
             walk_act(project, index, item, center, trail, dist, tagged)
         end)
     end
 end
 
-local function walk_begin(name)
+local function walk_begin(reference, opts)
+    opts = opts or {}
     local project = require_project()
     if not project then return end
     graph_cache.load(project, function(index, err)
@@ -271,11 +279,36 @@ local function walk_begin(name)
             log.error(err)
             return
         end
-        if not index.by_name[name] then
-            log.warn(name .. " is not a known model")
+        local candidates = reference and graph.matches(index, reference) or vim.tbl_values(index.nodes)
+        candidates = vim.tbl_filter(
+            function(entry)
+                return graph.resource_types[entry.resource_type]
+                    and (not opts.kind or entry.resource_type == opts.kind)
+                    and (not opts.dataset or entry.source_name == opts.dataset)
+            end,
+            candidates
+        )
+        if opts.file then
+            local local_entries = vim.tbl_filter(function(entry)
+                local path = projects.resource_path(project, entry, index.layout)
+                return path and vim.fn.resolve(path) == vim.fn.resolve(opts.file)
+            end, candidates)
+            if #local_entries > 0 then candidates = local_entries end
+        end
+        if #candidates == 0 then
+            log.warn((reference or opts.dataset or "Resource") .. " is not in the graph")
             return
         end
-        walk_loop(project, index, name, {}, graph.distances(index, name), {})
+        local function begin(entry)
+            if not entry then return end
+            local id = entry.unique_id
+            walk_loop(project, index, id, {}, graph.distances(index, id), {})
+        end
+        if #candidates == 1 then
+            begin(candidates[1])
+        else
+            picker.select({ items = candidates, prompt = "Walk from", format_item = graph.label }, begin)
+        end
     end)
 end
 
@@ -285,8 +318,20 @@ function M.walk(start)
         return
     end
     local model = context.current_model()
+    local filetype = vim.bo.filetype
+    if model and (filetype == "yaml" or filetype == "yml") then
+        local decl =
+            properties.declaration_at(vim.api.nvim_buf_get_lines(0, 0, -1, false), vim.api.nvim_win_get_cursor(0)[1])
+        if decl then
+            walk_begin(
+                decl.name,
+                { kind = decl.kind:sub(1, -2), dataset = decl.dataset, file = vim.api.nvim_buf_get_name(0) }
+            )
+            return
+        end
+    end
     if model then
-        walk_begin(model)
+        walk_begin(model, { file = vim.api.nvim_buf_get_name(0), kind = filetype == "csv" and "seed" or nil })
         return
     end
     local project = require_project()
@@ -300,38 +345,16 @@ function M.walk(start)
             log.warn "No models found"
             return
         end
-        picker.select({ items = items, prompt = "Walk from" }, function(item)
+        picker.select({ items = items, prompt = "Walk from", format_item = graph.label }, function(item)
             if not item then return end
-            walk_begin(item.name)
+            walk_begin(item.unique_id)
         end)
     end)
 end
 
 function M.goto_model()
     local project = require_project()
-    if not project then return end
-    local ref = graph.parse_model_ref(vim.api.nvim_get_current_line())
-    if not ref then
-        log.warn "No ref() or source() call on the current line"
-        return
-    end
-    graph_cache.load(project, function(index, err)
-        if err then
-            log.error(err)
-            return
-        end
-        local entry, alternatives = graph.resolve(index, ref.name, ref.source)
-        if not entry then
-            log.warn("Unknown model: " .. ref.name)
-            return
-        end
-        if alternatives > 0 then log.info("Multiple matches for " .. ref.name .. "; opening the best match") end
-        if not entry.path then
-            log.warn("No file path for " .. ref.name)
-            return
-        end
-        vim.cmd.edit(vim.fs.joinpath(project, entry.path))
-    end)
+    if project then goto_nav.goto_model(project) end
 end
 
 function M.refresh_graph()
@@ -354,18 +377,21 @@ function M.select_models()
             log.error(err)
             return
         end
-        picker.select_many({ items = items, prompt = "Select dbt models" }, function(selected)
-            if #selected == 0 then return end
-            vim.ui.select(
-                { "run", "test", "compile", "build" },
-                { prompt = "Select dbt operation" },
-                function(operation)
-                    if not operation then return end
-                    local selected_ids = selectors.from_resources(selected)
-                    execute_with_output(operation, table.concat(selected_ids, " "))
-                end
-            )
-        end)
+        picker.select_many(
+            { items = items, prompt = "Select dbt models", format_item = graph.label },
+            function(selected)
+                if #selected == 0 then return end
+                vim.ui.select(
+                    { "run", "test", "compile", "build" },
+                    { prompt = "Select dbt operation" },
+                    function(operation)
+                        if not operation then return end
+                        local selected_ids = selectors.from_resources(selected)
+                        execute_with_output(operation, table.concat(selected_ids, " "))
+                    end
+                )
+            end
+        )
     end)
 end
 

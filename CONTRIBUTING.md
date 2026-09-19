@@ -24,6 +24,18 @@ dbt compile
 dbt run
 ```
 
+## Demo project
+
+`demo/` is a mock dbt project (no dbt binary or warehouse required) for
+manual validation: both YAML layouts, same-table-two-datasets sources,
+cross-package refs, seeds, snapshots, and a mock `target/manifest.json`.
+See `demo/README.md`. Scale fixtures and benchmarks:
+
+```sh
+python3 scripts/generate-demo-scale.py --models 500
+nvim --headless --noplugin -u tests/minimal.vim -l scripts/bench-demo.lua demo/generated/scale
+```
+
 ## Hooks, format, lint, tests
 
 ```sh

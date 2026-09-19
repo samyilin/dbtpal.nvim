@@ -9,7 +9,7 @@ A Neovim plugin for dbt model editing. The little helper I wish I always had.
 - Async jobs with pop-up command outputs
 - Jinja-aware SQL syntax highlighting for dbt models
 - Disables accidentally modifying sql files in the target folders
-- Jump to `ref` or `source` files using `gf` (go-to-file)
+- Jump between SQL resources and YAML declarations with `goto_model()`
 - Automatically detect dbt project folder
 
 ## Requirements
@@ -36,6 +36,35 @@ Fusion compatibility is not guaranteed for every project. Adapter support,
 Python models, package constraints, CLI flags, artifact formats, and
 `dbt ls`-based picker behavior may differ between Python dbt and Fusion. The
 configured `path_to_dbt` must point to the intended executable.
+
+### Running dbt in Docker
+
+Point `path_to_dbt` at `docker` and put the `exec` invocation in
+`pre_cmd_args`. Arguments go directly to the executable, so resolve the
+container name before passing it in; shell substitutions such as `$(...)`
+are not evaluated. This recipe uses matching project and profiles paths
+on the host and in the container:
+
+```lua
+require("dbtpal").setup({
+    path_to_dbt = "docker",
+    pre_cmd_args = { "exec", "my-dbt-container", "dbt" },
+    path_to_dbt_project = "/repo",
+    stream_output = true,
+})
+```
+
+```sh
+docker run -d --name my-dbt-container --entrypoint sleep \
+  -v /repo:/repo -v "$HOME/.dbt:$HOME/.dbt:ro" my-dbt-image infinity
+```
+
+The image must provide `dbt` and `sleep`. Both `--project-dir` and
+`--profiles-dir` use the mounted paths. The `env` option affects the
+Docker client; to set variables inside the container, add `--env`,
+`"NAME=value"` after `"exec"` in `pre_cmd_args`. For `:Dbt docs serve`,
+publish its port with `docker run -p`; streaming displays its logs while
+the server runs. The output window is not an interactive terminal.
 
 ## Installation
 
@@ -72,6 +101,21 @@ Install using your favorite plugin manager:
             -- Picker backend: "default", "telescope", or "mini.pick"
             picker_backend = "default",
 
+            -- Hide external packages from model pickers and walk listings
+            exclude_packages = {},
+
+            -- Push failed-test locations to the quickfix list
+            use_quickfix = false,
+
+            -- Stream dbt output live instead of showing it only on exit
+            stream_output = false,
+
+            -- Floating window style: named border; width/height are editor
+            -- fractions in (0, 1] or absolute cells when greater than 1
+            float_border = "double",
+            float_width = 0.8,
+            float_height = 0.8,
+
             -- Auto-select the current model for run/test/compile/build
             use_current_model = true,
 
@@ -88,8 +132,7 @@ Install using your favorite plugin manager:
         -- Setup key mappings
         vim.keymap.set("n", "<leader>db", "<cmd>Dbt<cr>")
         vim.keymap.set("n", "<leader>dm", "<cmd>DbtSelectModels<cr>")
-        vim.keymap.set("n", "<leader>du", "<cmd>DbtSelectUpstream<cr>")
-        vim.keymap.set("n", "<leader>dd", "<cmd>DbtSelectDownstream<cr>")
+        vim.keymap.set("n", "<leader>dw", "<cmd>DbtWalk<cr>")
     end,
 }
 ```
@@ -112,8 +155,12 @@ vim.keymap.set("n", "<leader>dm", "<cmd>DbtSelectModels<cr>")
 
 ## Commands
 
-dbtpal has sensible defaults and can auto-detect project directories based
-on the currently open buffer when first run.
+An explicit `path_to_dbt_project` takes precedence. Otherwise the first
+successful project discovery, on a relevant buffer read or command, is
+reused for the session. Opening another project does not switch it. Call
+`setup()` again with the new project path and your other settings to switch.
+Local `oil://` directory names are normalized; other virtual URI names
+are excluded from project discovery.
 
 ### Dbt
 
@@ -130,13 +177,32 @@ is forwarded to dbt as an argument list:
 
 With no arguments, `:Dbt` shows usage. `:Dbt!` forces floating output.
 
-When `use_current_model` is enabled (the default) and no `--select` or
-`-s` is given, `run`, `test`, `compile`, and `build` use the model from
-the current SQL/dbt buffer. Outside a model buffer the command warns and
-aborts. Use `--select '*'` for an explicit whole-project run.
+When `use_current_model` is enabled (the default), `run`, `test`,
+`compile`, and `build` add the current resource name unless an explicit
+`--select`/`-s`, `--models`/`-m`, or `--selector` is given. Both
+`--select name` and `--select=name` work. SQL/dbt and CSV buffers use the
+filename; YAML buffers use the word under the cursor. Other buffers warn
+and abort. Use `--select *` for an explicit whole-project run; arguments
+use Neovim command escaping, not shell quoting or glob expansion.
 
 With `output_mode = "notify"`, successful commands only notify while
 failures still open the detailed floating output.
+
+Set `stream_output = true` to open floating output at job start and show
+stdout and stderr as they arrive. This also applies to picker/walk actions
+when you choose **Open full output**. Notify-only mode stays quiet until
+completion. Pressing `q` closes the float without cancelling the process.
+
+Style the float with `float_border` (`none`, `single`, `double`,
+`rounded`, `solid`, `shadow`), `float_width`, and `float_height`.
+Dimensions in (0, 1] scale with the editor; larger values are absolute
+cells. Invalid values warn at setup and fall back to defaults.
+
+With `use_quickfix = true`, `test`/`build` test-failure summaries populate
+quickfix, including generic tests declared in `.yml`/`.yaml`. Use `:copen`,
+`:cnext`, and `:cprev` to navigate. If dbt supplies no line number, the entry
+opens line 1 of the reported file. This parses dbt's text summaries, not
+JSON logs. A successful rerun clears the matching dbt quickfix list.
 
 ### DbtSelectModels
 
@@ -162,11 +228,17 @@ the picker until you reach your target:
 With no argument, the current buffer's model is the starting point (or a
 model picker when outside a model buffer). The walk works from model
 (SQL/dbt) and seed (CSV) buffers, plus YAML files (schema, sources,
-exposures) via the word under the cursor. Each step lists upstream (`↑`)
-and downstream (`↓`) neighbours — models, seeds, snapshots, and sources
-— plus `.. back`, each annotated with its shortest-path distance from
-where the walk started (e.g. `↑ raw (+1)`).
-`Enter` steps into the neighbour directly; `<C-o>` opens the action menu
+exposures) via the word under the cursor. Each step lists the direct
+upstream (`↑`) dependencies and downstream (`↓`) dependents — models,
+seeds, snapshots, and sources — plus `.. back`, each annotated with its
+shortest-path distance from where the walk started (e.g. `↑ raw (+1)`).
+Resources sharing a bare name are listed separately with qualified
+labels (`package.name`, `source:dataset.table`); stepping in, tagging,
+and run/test/compile/build all track the exact resource, and multi-model
+actions select it unambiguously. Each step also offers a `· yaml
+declaration` row for the current node only — its parallel YAML
+declaration, not an edge — which jumps straight to the properties file.
+`Enter` steps into the selected resource; `<C-o>` opens the action menu
 (`step into`, `open`, `run`, `test`, `compile`, `build`) for the current
 item instead. The prompt shows the breadcrumb trail, `Esc` exits the
 whole walk, and the dependency-free picker (which has no action key)
@@ -176,7 +248,7 @@ collection and operates on all of them at once (`open all` opens each in
 its own buffer, the rest run one combined `--select`). Everything
 resolves from the graph cache, so stepping is instant.
 
-### DbtGotoModel, DbtRefreshGraph
+### goto_model(), DbtRefreshGraph
 
 `goto_model()` jumps to the model referenced by the `ref()` or
 `source()` call on the current line. It is Lua-only by design — bind it
@@ -186,11 +258,49 @@ to a key rather than typing a command:
 vim.keymap.set("n", "gd", function() require("dbtpal").goto_model() end)
 ```
 
-Resolution uses a cached dependency graph built from the project's
-`target/manifest.json` (falling back to `dbt ls`), so jumps are instant
-and exact across packages, seeds, snapshots, and sources. When several
-sources share a table name, the `source('dataset', 'table')` dataset
-selects the right one. `DbtRefreshGraph` rebuilds the cache:
+Graph-backed resolution uses `target/manifest.json`, falling back to
+`dbt ls`, with a cache refreshed when the manifest changes. The jump is
+bidirectional:
+
+- In SQL, `ref()` opens the referenced resource. `source('dataset',
+  'table')` prefers the table's YAML declaration, falling back to the
+  graph with the same dataset qualifier. Missing datasets never resolve
+  to a different dataset with the same table name.
+- With no `ref()`/`source()` on the line, a model/seed buffer opens its
+  YAML declaration. Both shared `schema.yml` files and per-table layouts
+  such as `dataset/table.yml` work: matching is by content, not filename.
+- In YAML, a `models:`/`seeds:`/`snapshots:` entry opens its resource
+  file. A `sources:` table offers everything selecting from it (models,
+  tests, snapshots), SQL files first; a dataset header first offers its
+  tables when there is more than one.
+  Nested column entries belong to their enclosing resource.
+- Multiple matching declarations or resource definitions offer a picker.
+
+YAML lookup scans saved `*.yml`/`*.yaml` files outside the target
+directory on each jump. Files recorded by the manifest (`patch_path` and
+YAML `original_file_path`s) are trusted for discovery; the scan still
+covers the rest, since undocumented resources leave no manifest trace.
+The scanner recognizes block-style declarations with a literal `name:`
+key, in any key order; a deferred `name:` must precede nested list
+content, otherwise the entry is skipped rather than misresolved.
+Single-line flow-style mappings (`models: [{name: x}]`) are not parsed;
+they are collected into a change-aware report instead — the quickfix
+list when `use_quickfix` is set, otherwise a cache file plus a
+notification. Map such files in `yaml_flow_files` to silence them (`""`)
+or to resolve jumps to a named model (`"model"`); keys resolve against
+the project directory, then the working directory. Unknown entries warn
+once per session. Mapped models are verified against the on-disk graph
+cache once per manifest state — verification never runs dbt, and defers
+silently without a cache — and resolve with a `(user config)` mark in
+picker labels.
+
+File opens resolve against the owning package: manifest paths are joined
+to the installed package directory (honoring `packages-install-path`),
+and the manifest is read from the configured `target-path`. Both can be
+overridden with `path_to_dbt_target` and `path_to_dbt_packages`.
+
+`DbtRefreshGraph` rebuilds the cached graph from existing artifacts;
+run dbt first if you need an updated manifest:
 
 ```vim
 :DbtRefreshGraph
@@ -215,9 +325,17 @@ Arguments are structured Lua lists only, never shell strings:
 require("dbtpal").run_command("compile", { "--target", "prod" })
 ```
 
-Lower-level modules remain available for integrations:
+Lower-level primitives remain available for integrations:
 `require("dbtpal").context`, `require("dbtpal").selectors`,
 `require("dbtpal").execute`, and `require("dbtpal").picker`.
+
+`execute(command, args, callback, opts)` invokes the subprocess without
+opening UI. The callback receives `{ code, signal, stdout, stderr }` on
+Neovim's main loop. Optional `opts.on_chunk(data, stream)` receives live
+chunks on the same loop (`stream` is `"stdout"` or `"stderr"`); complete
+output is still returned at exit. `run_command()` and `execute()` return
+a `vim.SystemObj` on successful launch, which Lua callers can cancel with
+`:kill(15)`.
 
 ## Pickers
 
@@ -227,12 +345,18 @@ ending in `Done` for multi-select). Set it to `"telescope"` or
 `"mini.pick"` only when the corresponding plugin is installed. Cancel with
 `<Esc>` or `<C-c>`.
 
+Use `exclude_packages = { "package_name" }` to hide those packages from
+model lists and walk listings. Names are dbt's `package_name` values.
+Filtering affects the lists, preserving the graph's dependency edges
+and explicit reference jumps.
+
 ## Primitives
 
 The implementation layers are independent:
 
-- **context**: rejects non-file, Oil, terminal, help, and non-SQL buffers
-  when a model is required; normalizes `oil://` URIs.
+- **context**: obtains resource names from SQL/dbt, CSV, and YAML buffers;
+  rejects non-file buffers when a resource is required.
+- **paths**: normalizes local/Oil paths and rejects other virtual URIs.
 - **execute**: uses the configured executable and `vim.system()`; passes
   arguments as a list; adds project/profile options once; returns stdout,
   stderr, and exit code.
@@ -240,9 +364,13 @@ The implementation layers are independent:
   Malformed JSON and nonzero exits are errors, not silent empty results.
 - **selectors**: `model`, `+model`, `model+`, `+model+`, `tag:name`, and
   `path:dir`, using resource names rather than artifact `unique_id`
-  values.
+  values. Multi-resource actions qualify ambiguous selections
+  (`source:dataset.table`, `fqn:package.model`, `package:`, and
+  `resource_type:` intersections) so shared names select exactly.
 - **picker**: core returns resources and accepts selections; adapters
   implement `select` and optionally `select_many`.
+- **properties**: scans YAML declarations independently of the graph.
+- **quickfix**: converts dbt test summaries into navigable locations.
 
 The shared compatibility surface is the dbt CLI. `dbt compile` renders
 SQL but does not guarantee executable output; use `run`, `test`, or
@@ -260,21 +388,77 @@ The following options are available:
 | path_to_dbt              | Path to the dbt executable                                           | `dbt`                  |
 | path_to_dbt_project      | Path to the dbt project                                              | `""` (auto-detect)     |
 | path_to_dbt_profiles_dir | Path to dbt profiles directory                                       | `"~/.dbt"`             |
+| path_to_dbt_target       | Override for the manifest directory (reads `target-path` otherwise)  | `""` (auto-detect)     |
+| path_to_dbt_packages     | Override for installed packages (reads `packages-install-path`)      | `""` (auto-detect)     |
 | extended_path_search     | Search for ref/source files in macros and models folders             | `true`                 |
 | protect_compiled_files   | Prevent modifying sql files in target/(compiled\|run) folders        | `true`                 |
 | include_profiles_dir     | Include `--profiles-dir` flag in dbt command                         | `true`                 |
 | include_project_dir      | Include `--project-dir` flag in dbt command                          | `true`                 |
 | include_log_level        | Include `--log-level=INFO` flag in dbt command (only for dbt >= 1.5) | `true`                 |
 | picker_backend           | Picker backend: `"default"`, `"telescope"`, or `"mini.pick"`         | `"default"`            |
+| exclude_packages           | Package names hidden from model pickers and walk listings              | `{}`                   |
+| use_quickfix               | Send failed-test locations to the quickfix list                        | `false`                |
+| yaml_flow_files            | Map flow-style YAML files to `""` (silence) or a model name (verified once per manifest; marked user config) | `{}` |
+| stream_output              | Stream dbt output live in the float instead of only on exit            | `false`                |
+| float_border               | Floating window border style                                           | `"double"`             |
+| float_width                | Float width: editor fraction in (0, 1], else absolute cells            | `0.8`                  |
+| float_height               | Float height: editor fraction in (0, 1], else absolute cells           | `0.8`                  |
+| custom_dbt_syntax_enabled  | Layer dbt Jinja highlighting over SQL syntax                           | `true`                 |
+| env                        | Environment overrides for dbt subprocesses (inherits the host environment) | `{}`                |
 | use_current_model        | Auto-select the current model when no selector is given              | `true`                 |
 | output_mode              | `"float"` opens output always; `"notify"` stays quiet on success     | `"float"`              |
 | pre_cmd_args             | Additional flags at the beginning of the rendered dbt command        | `{}`                   |
 | post_cmd_args            | Additional flags at the end of the rendered dbt command              | `{}`                   |
 
+Generated project/profile/log-level flags are only added when not already
+supplied. Log-level support is detected using the configured executable
+and `pre_cmd_args`, including Docker wrappers; the result is cached until
+that command or `env` configuration changes. Set `include_log_level = false`
+to skip the version probe and let dbt choose its logging level. The default
+`env = {}` does not suppress dbt's logs.
+
+### SQL syntax
+
+`custom_dbt_syntax_enabled` adds Jinja highlighting on top of SQL. To use
+an installed SQL dialect syntax, set its runtime name before opening SQL
+buffers, for example `vim.g.dbtpal_sql_base = "sqlbigquery"`. The default
+base is `"sql"`. Set `custom_dbt_syntax_enabled = false` to use SQL syntax
+without the dbt overlay.
+
 ### Misc
 
 Log level can be set with `vim.g.dbtpal_log_level` (must be **before**
 `setup()`) or on the command line: `DBTPAL_LOG_LEVEL=info nvim myfile.sql`
+
+## Relationship to upstream
+
+This fork descends from `PedramNavid/dbtpal` and deliberately diverges
+in a few places, so some upstream requests are addressed differently
+rather than adopted as proposed:
+
+- Upstream/downstream pickers ([#34], [#35]): covered by `DbtWalk`,
+  which steps the cached graph in both directions instead of one-shot
+  `--select=model±` pickers. There are intentionally no
+  `DbtSelectUpstream` / `DbtSelectDownstream` commands.
+- Picker speed ([#18]): addressed with a `manifest.json`-backed graph
+  cache instead of a `dbt ls` call on every picker open.
+- Extra dbt commands ([#31]): covered by the unified `:Dbt`
+  pass-through instead of one wrapper per dbt subcommand.
+- Directly addressed: `oil://` project dir ([#32]), package filtering
+  via `exclude_packages` ([#10]), quickfix via `use_quickfix` ([#9]),
+  bidirectional YAML jumps ([#6]), Docker usage (see above, [#15]),
+  and live output via `stream_output` ([#12]).
+
+[#6]: https://github.com/PedramNavid/dbtpal/issues/6
+[#9]: https://github.com/PedramNavid/dbtpal/issues/9
+[#10]: https://github.com/PedramNavid/dbtpal/issues/10
+[#12]: https://github.com/PedramNavid/dbtpal/issues/12
+[#15]: https://github.com/PedramNavid/dbtpal/issues/15
+[#18]: https://github.com/PedramNavid/dbtpal/issues/18
+[#31]: https://github.com/PedramNavid/dbtpal/pull/31
+[#32]: https://github.com/PedramNavid/dbtpal/issues/32
+[#34]: https://github.com/PedramNavid/dbtpal/issues/34
+[#35]: https://github.com/PedramNavid/dbtpal/pull/35
 
 ## Development
 

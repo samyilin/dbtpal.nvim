@@ -1,0 +1,5 @@
+version: 2
+
+models:
+  - name: page_views
+    description: "Packaged page views model"

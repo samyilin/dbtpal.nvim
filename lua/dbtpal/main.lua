@@ -1,49 +1,37 @@
 local config = require "dbtpal.config"
-local projects = require "dbtpal.projects"
-local commands = require "dbtpal.commands"
+local context = require "dbtpal.context"
+local execute = require "dbtpal.execute"
+local quickfix = require "dbtpal.quickfix"
 local log = require "dbtpal.log"
 local display = require "dbtpal.display"
 
 local M = {}
 
-M.run_command = function(cmd, args, output_mode) return M._create_job(cmd, args, output_mode) end
-
-M._create_job = function(cmd, args, output_mode)
-    log.info("dbt " .. cmd .. " started")
-    if config.options.path_to_dbt_project == "" then
-        local bpath = vim.fn.expand "%:p:h"
-        if projects.detect_dbt_project_dir(bpath) == false then
-            log.warn(
-                "Could not detect dbt project dir, try setting it manually "
-                    .. "or make sure this file is in a dbt project folder"
-            )
-            return
-        end
+function M.run_command(cmd, args, output_mode)
+    local project = context.project_for_buffer()
+    if not project then
+        log.warn "Could not detect dbt project dir; set path_to_dbt_project or open a file in a dbt project"
+        return
     end
-
-    local onexit = function(data, code)
-        if (output_mode or config.options.output_mode) == "float" or code ~= 0 then display.popup(data) end
-    end
+    project = vim.fs.normalize(vim.fn.fnamemodify(project, ":p"))
+    local float_mode = (output_mode or config.options.output_mode) == "float"
+    local streaming = float_mode and config.options.stream_output and display.stream() or nil
     if args == "" then args = nil end
-    local dbt_path, cmd_args = commands.build_path_args(cmd, args)
-    local job = vim.system(vim.list_extend({ dbt_path }, cmd_args), { text = true }, function(result)
-        local response = vim.split(result.stdout or "", "\n", { plain = true, trimempty = true })
-        local stderr = vim.split(result.stderr or "", "\n", { plain = true, trimempty = true })
-        local code = result.code
-        if code == 1 then
-            log.warn "dbt command encounted a handled error, see popup for details"
-        elseif code >= 2 then
-            table.insert(response, "Failed to run dbt command. Exit Code: " .. code .. "\n")
-            local a = table.concat(cmd_args, " ") or ""
-            local err = string.format("dbt command failed: %s %s\n\n", dbt_path, a)
-            table.insert(response, "------------\n")
-            table.insert(response, err)
-            vim.list_extend(response, stderr)
+    return execute.run(cmd, args, function(result)
+        local response = vim.split(result.stdout .. "\n" .. result.stderr, "\n", { trimempty = true })
+        if result.code ~= 0 then
+            local status = "dbt " .. cmd .. " failed (exit " .. result.code .. ")"
+            response[#response + 1] = status
+            log.warn(status)
+            if streaming then streaming.push("\r\n" .. status .. "\r\n") end
         end
-        if code == 0 then log.info("dbt " .. cmd .. " completed") end
-        vim.schedule(function() onexit(response, code) end)
-    end)
-    return job
+        quickfix.publish(cmd, result, project)
+        if streaming then
+            streaming.finish()
+        elseif float_mode or result.code ~= 0 then
+            display.popup(response)
+        end
+    end, streaming and { on_chunk = streaming.push } or nil)
 end
 
 return M

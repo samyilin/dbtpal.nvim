@@ -3,11 +3,30 @@ local config = require "dbtpal.config"
 
 local M = {}
 
-local get_dbt_version = function()
-    local cmd = vim.fn.systemlist "dbt --version | grep -Eo '[0-9]+\\.[0-9]+' | head -n 1"
-    local version = cmd[1]
-    log.debug("dbt version: " .. version)
-    return tonumber(version)
+local version_cache = {}
+
+local function supports_log_level()
+    local argv = vim.list_extend({ config.options.path_to_dbt }, config.options.pre_cmd_args or {})
+    argv[#argv + 1] = "--version"
+    local key = vim.json.encode { argv, config.options.env }
+    if version_cache.key == key then return version_cache.supported end
+    local ok, result = pcall(
+        function() return vim.system(argv, { text = true, env = config.options.env }):wait(5000) end
+    )
+    local major, minor
+    if ok and result.code == 0 then
+        major, minor = ((result.stdout or "") .. (result.stderr or "")):match "(%d+)%.(%d+)"
+    end
+    local supported = major ~= nil and (tonumber(major) > 1 or (tonumber(major) == 1 and tonumber(minor) >= 5))
+    version_cache = { key = key, supported = supported }
+    return supported
+end
+
+local function has_flag(args, flag)
+    for _, arg in ipairs(args) do
+        if arg == flag or arg:sub(1, #flag + 1) == flag .. "=" then return true end
+    end
+    return false
 end
 
 M.build_path_args = function(cmd, args)
@@ -21,33 +40,34 @@ M.build_path_args = function(cmd, args)
 
     local cmd_args = {}
 
-    -- TODO: make this configurable
     -- Copy configured arguments before adding generated options. Mutating the
     -- config here duplicates --profiles-dir/--project-dir on every command.
     local pre_cmd_args = vim.deepcopy(config.options.pre_cmd_args or {})
     local post_cmd_args = vim.deepcopy(config.options.post_cmd_args or {})
+    if type(args) == "string" then args = vim.split(args, " ") end
+    args = args or {}
+    local function supplied(flag)
+        return has_flag(pre_cmd_args, flag) or has_flag(args, flag) or has_flag(post_cmd_args, flag)
+    end
 
-    if include_profiles_dir and dbt_profile ~= "v:null" then
+    if include_profiles_dir and dbt_profile and dbt_profile ~= "" and not supplied "--profiles-dir" then
         table.insert(post_cmd_args, "--profiles-dir")
         table.insert(post_cmd_args, dbt_profile)
     end
 
-    if include_project_dir and dbt_project ~= "v:null" then
+    if include_project_dir and dbt_project and dbt_project ~= "" and not supplied "--project-dir" then
         table.insert(post_cmd_args, "--project-dir")
         table.insert(post_cmd_args, dbt_project)
     end
 
-    if include_log_level and get_dbt_version() ~= nil and get_dbt_version() >= 1.5 then
-        log.debug "dbt version >= 1.5, using --log-level=INFO"
+    if include_log_level and not supplied "--log-level" and supports_log_level() then
         table.insert(post_cmd_args, "--log-level=INFO")
     end
 
     vim.list_extend(cmd_args, pre_cmd_args)
     vim.list_extend(cmd_args, { cmd })
 
-    if type(args) == "string" then args = vim.split(args, " ") end
-
-    if args ~= nil then vim.list_extend(cmd_args, args) end
+    vim.list_extend(cmd_args, args)
 
     vim.list_extend(cmd_args, post_cmd_args)
 

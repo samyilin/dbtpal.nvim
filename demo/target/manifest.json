@@ -1,0 +1,218 @@
+{
+  "metadata": {
+    "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json",
+    "project_name": "demo_project"
+  },
+  "nodes": {
+    "model.demo_project.customers": {
+      "depends_on": {
+        "nodes": [
+          "model.demo_project.stg_customers",
+          "model.snowplow_utils.page_views"
+        ]
+      },
+      "fqn": [
+        "demo_project",
+        "marts",
+        "customers"
+      ],
+      "name": "customers",
+      "original_file_path": "models/marts/customers.sql",
+      "package_name": "demo_project",
+      "resource_type": "model",
+      "patch_path": "models/schema.yml"
+    },
+    "model.demo_project.orders": {
+      "depends_on": {
+        "nodes": [
+          "model.demo_project.stg_customers",
+          "model.demo_project.stg_orders"
+        ]
+      },
+      "fqn": [
+        "demo_project",
+        "marts",
+        "orders"
+      ],
+      "name": "orders",
+      "original_file_path": "models/marts/orders.sql",
+      "package_name": "demo_project",
+      "resource_type": "model",
+      "patch_path": "models/schema.yml"
+    },
+    "model.demo_project.shop_orders": {
+      "depends_on": {
+        "nodes": [
+          "model.demo_project.stg_shop_orders"
+        ]
+      },
+      "fqn": [
+        "demo_project",
+        "marts",
+        "shop_orders"
+      ],
+      "name": "shop_orders",
+      "original_file_path": "models/marts/shop_orders.sql",
+      "package_name": "demo_project",
+      "resource_type": "model"
+    },
+    "model.demo_project.stg_customers": {
+      "depends_on": {
+        "nodes": [
+          "source.demo_project.billing.customers"
+        ]
+      },
+      "fqn": [
+        "demo_project",
+        "staging",
+        "stg_customers"
+      ],
+      "name": "stg_customers",
+      "original_file_path": "models/staging/stg_customers.sql",
+      "package_name": "demo_project",
+      "resource_type": "model"
+    },
+    "model.demo_project.stg_orders": {
+      "depends_on": {
+        "nodes": [
+          "source.demo_project.billing.orders"
+        ]
+      },
+      "fqn": [
+        "demo_project",
+        "staging",
+        "stg_orders"
+      ],
+      "name": "stg_orders",
+      "original_file_path": "models/staging/stg_orders.sql",
+      "package_name": "demo_project",
+      "resource_type": "model",
+      "patch_path": "models/schema.yml"
+    },
+    "model.demo_project.stg_shop_orders": {
+      "depends_on": {
+        "nodes": [
+          "source.demo_project.shop.orders"
+        ]
+      },
+      "fqn": [
+        "demo_project",
+        "staging",
+        "stg_shop_orders"
+      ],
+      "name": "stg_shop_orders",
+      "original_file_path": "models/staging/stg_shop_orders.sql",
+      "package_name": "demo_project",
+      "resource_type": "model"
+    },
+    "model.snowplow_utils.page_views": {
+      "depends_on": {
+        "nodes": []
+      },
+      "fqn": [
+        "snowplow_utils",
+        "page_views"
+      ],
+      "name": "page_views",
+      "original_file_path": "models/page_views.sql",
+      "package_name": "snowplow_utils",
+      "resource_type": "model",
+      "patch_path": "models/utils.yml"
+    },
+    "seed.demo_project.raw_regions": {
+      "depends_on": {
+        "nodes": []
+      },
+      "fqn": [
+        "demo_project",
+        "raw_regions"
+      ],
+      "name": "raw_regions",
+      "original_file_path": "seeds/raw_regions.csv",
+      "package_name": "demo_project",
+      "resource_type": "seed",
+      "patch_path": "seeds/seeds.yml"
+    },
+    "snapshot.demo_project.orders_snapshot": {
+      "depends_on": {
+        "nodes": [
+          "model.demo_project.orders"
+        ]
+      },
+      "fqn": [
+        "demo_project",
+        "orders_snapshot"
+      ],
+      "name": "orders_snapshot",
+      "original_file_path": "snapshots/orders_snapshot.sql",
+      "package_name": "demo_project",
+      "resource_type": "snapshot"
+    },
+    "test.demo_project.not_null_orders": {
+      "depends_on": {
+        "nodes": [
+          "model.demo_project.orders"
+        ]
+      },
+      "fqn": [
+        "demo_project",
+        "not_null_orders"
+      ],
+      "name": "not_null_orders",
+      "original_file_path": "models/schema.yml",
+      "package_name": "demo_project",
+      "resource_type": "test",
+      "patch_path": "models/schema.yml"
+    }
+  },
+  "sources": {
+    "source.demo_project.billing.customers": {
+      "depends_on": {
+        "nodes": []
+      },
+      "fqn": [
+        "demo_project",
+        "billing",
+        "customers"
+      ],
+      "name": "customers",
+      "original_file_path": "dataset/billing.yml",
+      "package_name": "demo_project",
+      "resource_type": "source",
+      "source_name": "billing",
+      "patch_path": "dataset/billing.yml"
+    },
+    "source.demo_project.billing.orders": {
+      "depends_on": {
+        "nodes": []
+      },
+      "fqn": [
+        "demo_project",
+        "billing",
+        "orders"
+      ],
+      "name": "orders",
+      "original_file_path": "dataset/billing.yml",
+      "package_name": "demo_project",
+      "resource_type": "source",
+      "source_name": "billing",
+      "patch_path": "dataset/billing.yml"
+    },
+    "source.demo_project.shop.orders": {
+      "depends_on": {
+        "nodes": []
+      },
+      "fqn": [
+        "demo_project",
+        "shop",
+        "orders"
+      ],
+      "name": "orders",
+      "original_file_path": "dataset/shop.yml",
+      "package_name": "demo_project",
+      "resource_type": "source",
+      "source_name": "shop",
+      "patch_path": "dataset/shop.yml"
+    }
+  }
+}

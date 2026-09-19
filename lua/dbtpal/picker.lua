@@ -1,3 +1,15 @@
+---@class dbtpal.PickerOpts
+---@field items table[]?
+---@field prompt string?
+---@field format_item (fun(item: table): string?)?
+---@field backend string?
+---@field on_action (fun(item: table))?
+
+---@class dbtpal.PickerBackend
+---@field select fun(opts: dbtpal.PickerOpts, callback: fun(item: table?))
+---@field select_many (fun(opts: dbtpal.PickerOpts, callback: fun(selected: table[])))?
+---@field action_key string?
+
 local M = { backends = {} }
 local config = require "dbtpal.config"
 
@@ -42,8 +54,12 @@ local function builtin_select_many(opts, callback)
     choose_next()
 end
 
+---@param name string
+---@param backend dbtpal.PickerBackend
 function M.register(name, backend) M.backends[name] = backend end
 
+---@param name string?
+---@return dbtpal.PickerBackend
 function M.get(name)
     name = name or config.options.picker_backend
     if name and M.backends[name] then return M.backends[name] end
@@ -51,8 +67,12 @@ function M.get(name)
     return { select = builtin_select, select_many = builtin_select_many }
 end
 
+---@param opts dbtpal.PickerOpts?
+---@param callback fun(item: table?)
 function M.select(opts, callback) return M.get(opts and opts.backend).select(opts or {}, callback) end
 
+---@param opts dbtpal.PickerOpts?
+---@param callback fun(selected: table[])
 function M.select_many(opts, callback)
     local backend = M.get(opts and opts.backend)
     return (backend.select_many or builtin_select_many)(opts or {}, callback)

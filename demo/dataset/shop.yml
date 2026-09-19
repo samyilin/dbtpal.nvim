@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: shop
+    description: "Shop dataset"
+    tables:
+      - name: orders
+        description: "Shop orders: same table name as billing.orders"

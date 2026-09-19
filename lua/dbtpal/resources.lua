@@ -1,9 +1,22 @@
 local execute = require "dbtpal.execute"
+local config = require "dbtpal.config"
 
 local M = {}
 
+---Drop resources whose package_name is in config exclude_packages.
+---Empty option disables filtering.
+function M.excluding(items)
+    local excluded = config.options.exclude_packages or {}
+    if #excluded == 0 then return items end
+    local skip = {}
+    for _, name in ipairs(excluded) do
+        skip[name] = true
+    end
+    return vim.tbl_filter(function(item) return not skip[item.package_name] end, items)
+end
+
 function M.normalize(row)
-    if type(row) ~= "table" then return nil end
+    if type(row) ~= "table" or not row.name or not row.unique_id or not row.resource_type then return nil end
     return {
         unique_id = row.unique_id,
         name = row.name,
@@ -11,6 +24,8 @@ function M.normalize(row)
         original_file_path = row.original_file_path or row.path,
         path = row.original_file_path or row.path,
         package_name = row.package_name,
+        source_name = row.source_name,
+        fqn = row.fqn,
     }
 end
 
@@ -38,7 +53,7 @@ function M.list(opts, callback)
             end
             resources[#resources + 1] = resource
         end
-        callback(resources, nil)
+        callback(M.excluding(resources), nil)
     end)
 end
 

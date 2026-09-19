@@ -1,0 +1,26 @@
+version: 2
+
+models:
+  - name: orders
+    description: "One row per order"
+    columns:
+      - name: order_id
+        description: "Primary key"
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+    unit_tests:
+      - name: test_orders_have_customers
+        model: orders
+        given: []
+        expect:
+          rows: []
+
+  - description: "One row per customer; name key deliberately second"
+    name: customers
+    columns:
+      - name: customer_id
+
+  - name: stg_orders
+    description: "Typed billing orders"
