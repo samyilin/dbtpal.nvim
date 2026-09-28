@@ -1,13 +1,16 @@
 local commands = require "dbtpal.commands"
 local config = require "dbtpal.config"
+local projects = require "dbtpal.projects"
 local log = require "dbtpal.log"
 
 local M = {}
 
 ---Run a dbt command. opts.on_chunk(data, stream) and callback(result)
 ---run on the main loop. Streaming also preserves the complete result.
+---opts.project pins the project; otherwise resolve the current buffer now.
 function M.run(command, args, callback, opts)
-    local dbt_path, cmd_args = commands.build_path_args(command, args or {})
+    local project = opts and opts.project or projects.resolve()
+    local dbt_path, cmd_args = commands.build_path_args(command, args or {}, project)
     local chunks = { stdout = {}, stderr = {} }
     local on_chunk = opts and opts.on_chunk
     local function reader(stream)

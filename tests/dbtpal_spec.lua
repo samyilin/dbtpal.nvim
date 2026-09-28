@@ -28,7 +28,7 @@ it("builds dbt commands", function()
         "--profiles-dir",
         "./tests/dbt_project/",
         "--project-dir",
-        "./tests/dbt_project/",
+        vim.fn.getcwd() .. "/tests/dbt_project",
     }, args)
 end)
 
@@ -329,17 +329,13 @@ end)
 
 it("finds the dbt project directory", function()
     require("dbtpal.config").options.path_to_dbt_project = ""
-    check_true(projects.detect_dbt_project_dir "tests/dbt_project/models/example", "expected project detection")
-    check_equal(vim.fn.getcwd() .. "/tests/dbt_project", require("dbtpal.config").options.path_to_dbt_project)
+    check_equal(vim.fn.getcwd() .. "/tests/dbt_project", projects.resolve "tests/dbt_project/models/example")
 end)
 
 it("never clobbers a configured project dir", function()
     local config = require "dbtpal.config"
     config.options.path_to_dbt_project = "/manual/project"
-    check_true(
-        projects.detect_dbt_project_dir "tests/dbt_project/models/example",
-        "expected true for configured project"
-    )
+    check_equal("/manual/project", projects.resolve "tests/dbt_project/models/example")
     check_equal("/manual/project", config.options.path_to_dbt_project)
     check_equal(vim.fn.getcwd() .. "/tests/dbt_project", projects.find_project_dir "tests/dbt_project/models/example")
 end)
@@ -349,7 +345,67 @@ it("strips oil:// URIs from paths", function()
     check_equal("/proj/models", projects.normalize_path "/proj/models")
     check_true(projects.normalize_path "fugitive:///repo/.git//0/models/a.sql" == nil, "expected nil for fugitive URI")
     require("dbtpal.config").options.path_to_dbt_project = ""
-    check_true(projects.detect_dbt_project_dir "fugitive:///repo/.git//0/models" == false, "expected no detection")
+    check_true(projects.resolve "fugitive:///repo/.git//0/models" == nil, "expected no detection")
+end)
+
+it("resolves each buffer to its own project", function()
+    local config = require "dbtpal.config"
+    local context = require "dbtpal.context"
+    config.options.path_to_dbt_project = ""
+    local root = vim.fn.resolve(vim.fn.tempname())
+    local original_buf = vim.api.nvim_get_current_buf()
+    vim.fn.mkdir(root .. "/projA/models", "p")
+    vim.fn.mkdir(root .. "/projB/models", "p")
+    vim.fn.writefile({ "name: a" }, root .. "/projA/dbt_project.yml")
+    vim.fn.writefile({ "name: b" }, root .. "/projB/dbt_project.yml")
+    vim.fn.writefile({ "select 1" }, root .. "/projA/models/a.sql")
+    vim.fn.writefile({ "select 1" }, root .. "/projB/models/b.sql")
+    local ok, err = xpcall(function()
+        vim.cmd.edit(root .. "/projA/models/a.sql")
+        check_equal(root .. "/projA", context.project_for_buffer())
+        vim.cmd.edit(root .. "/projB/models/b.sql")
+        check_equal(root .. "/projB", context.project_for_buffer())
+        check_equal("", config.options.path_to_dbt_project)
+    end, debug.traceback)
+    vim.api.nvim_set_current_buf(original_buf)
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_get_name(buf):sub(1, #root) == root then vim.api.nvim_buf_delete(buf, { force = true }) end
+    end
+    vim.fn.delete(root, "rf")
+    if not ok then error(err) end
+end)
+
+it("keeps yaml_flow_files scoped per project", function()
+    local root = vim.fn.resolve(vim.fn.tempname())
+    vim.fn.mkdir(root .. "/projA/models", "p")
+    vim.fn.mkdir(root .. "/projB/models", "p")
+    vim.fn.writefile({ "models: [{name: alpha}]" }, root .. "/projA/models/flow.yml")
+    vim.fn.writefile({ "models: [{name: beta}]" }, root .. "/projB/models/flow.yml")
+    local ok, err = xpcall(function()
+        local mapping = { ["models/flow.yml"] = "m" }
+        require("dbtpal.config").options.yaml_flow_files = mapping
+        local decls_a = properties.apply_flow_config(root .. "/projA", {}, {})
+        local decls_b = properties.apply_flow_config(root .. "/projB", {}, {})
+        check_equal(1, #properties.find(decls_a, { name = "m" }))
+        check_equal(root .. "/projA/models/flow.yml", properties.find(decls_a, { name = "m" })[1].file)
+        check_equal(1, #properties.find(decls_b, { name = "m" }))
+        check_equal(root .. "/projB/models/flow.yml", properties.find(decls_b, { name = "m" })[1].file)
+    end, debug.traceback)
+    require("dbtpal.config").options.yaml_flow_files = {}
+    vim.fn.delete(root, "rf")
+    if not ok then error(err) end
+end)
+
+it("prefers an explicit project for --project-dir", function()
+    local config = require "dbtpal.config"
+    config.options.path_to_dbt_project = "/projA"
+    config.options.include_log_level = false
+    local _, args = commands.build_path_args("run", {}, "/projB")
+    local dir = nil
+    for i, arg in ipairs(args) do
+        if arg == "--project-dir" then dir = args[i + 1] end
+    end
+    check_equal("/projB", dir)
 end)
 
 it("excludes configured packages from resources", function()

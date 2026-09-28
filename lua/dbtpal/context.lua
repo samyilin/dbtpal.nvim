@@ -1,4 +1,3 @@
-local config = require "dbtpal.config"
 local projects = require "dbtpal.projects"
 
 local M = {}
@@ -26,10 +25,6 @@ function M.require_model_buffer()
     return model
 end
 
-function M.project_for_buffer()
-    if config.options.path_to_dbt_project ~= "" then return config.options.path_to_dbt_project end
-    if projects.detect_dbt_project_dir() then return config.options.path_to_dbt_project end
-    return nil
-end
+function M.project_for_buffer() return projects.resolve() end
 
 return M

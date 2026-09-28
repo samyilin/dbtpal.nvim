@@ -1,4 +1,3 @@
-local config = require "dbtpal.config"
 local execute = require "dbtpal.execute"
 local graph = require "dbtpal.graph"
 local projects = require "dbtpal.projects"
@@ -124,7 +123,7 @@ local function rebuild_from_ls(project_dir, layout, callback)
         index.layout = layout
         write_cache(project_dir, index, file_mtime(manifest_path(layout)), layout)
         callback(index, nil)
-    end)
+    end, { project = project_dir })
 end
 
 ---Read the on-disk graph cache without rebuilding. Returns the index or
@@ -132,6 +131,7 @@ end
 ---for cheap read-only checks where a rebuild must not block the UI.
 function M.cached(project_dir)
     local layout = projects.layout(project_dir)
+    project_dir = layout.root
     local payload = read_cache(project_dir)
     if not payload then return nil end
     local index = graph.build_index(payload.nodes)
@@ -142,6 +142,7 @@ end
 ---Load the cached graph, rebuilding when the manifest is newer.
 function M.load(project_dir, callback)
     local layout = projects.layout(project_dir)
+    project_dir = layout.root
     local payload = read_cache(project_dir)
     local mtime = file_mtime(manifest_path(layout))
     if payload and payload.manifest_path == manifest_path(layout) and payload.manifest_mtime == mtime then
@@ -160,16 +161,12 @@ end
 
 function M.refresh(project_dir, callback)
     local layout = projects.layout(project_dir)
+    project_dir = layout.root
     if file_mtime(manifest_path(layout)) > 0 then
         rebuild_from_manifest(project_dir, layout, callback)
     else
         rebuild_from_ls(project_dir, layout, callback)
     end
-end
-
-function M.project_dir()
-    if config.options.path_to_dbt_project ~= "" then return config.options.path_to_dbt_project end
-    return nil
 end
 
 return M

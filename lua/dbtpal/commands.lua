@@ -29,12 +29,12 @@ local function has_flag(args, flag)
     return false
 end
 
-M.build_path_args = function(cmd, args)
+---@param project string? Explicit project dir; falls back to global config.
+M.build_path_args = function(cmd, args, project)
     log.debug("dbtpal config: " .. vim.inspect(config.options))
     local dbt_path = config.options.path_to_dbt
-    local dbt_project = config.options.path_to_dbt_project
+    local dbt_project = project or config.options.path_to_dbt_project
     local dbt_profile = config.options.path_to_dbt_profiles_dir
-    local include_profiles_dir = config.options.include_profiles_dir
     local include_project_dir = config.options.include_project_dir
     local include_log_level = config.options.include_log_level
 
@@ -50,7 +50,7 @@ M.build_path_args = function(cmd, args)
         return has_flag(pre_cmd_args, flag) or has_flag(args, flag) or has_flag(post_cmd_args, flag)
     end
 
-    if include_profiles_dir and dbt_profile and dbt_profile ~= "" and not supplied "--profiles-dir" then
+    if dbt_profile and dbt_profile ~= "" and not supplied "--profiles-dir" then
         table.insert(post_cmd_args, "--profiles-dir")
         table.insert(post_cmd_args, dbt_profile)
     end

@@ -2,6 +2,7 @@
 local config = require "dbtpal.config"
 local log = require "dbtpal.log"
 local projects = require "dbtpal.projects"
+local paths = require "dbtpal.paths"
 local M = {}
 local kinds = { models = true, seeds = true, snapshots = true, sources = true }
 
@@ -168,6 +169,27 @@ function M.find(decls, spec)
     )
 end
 
+---Scope a scan or mapping pass to this project and its installed packages.
+---Cache directory ownership only for this pass, so new project markers and
+---symlink changes are visible on the next jump.
+local function project_files(layout)
+    local root, packages = vim.fn.resolve(layout.root), vim.fn.resolve(layout.packages)
+    local directories = {}
+    return function(file)
+        -- dbt can install local packages as symlinks outside the project.
+        if paths.contains(layout.packages, file) then return true end
+        file = vim.fn.resolve(file)
+        if paths.contains(packages, file) then return true end
+        if not paths.contains(root, file) then return false end
+        local dir = vim.fs.dirname(file)
+        if directories[dir] == nil then
+            local owner = projects.find_project_dir(dir)
+            directories[dir] = not owner or owner == root or not paths.contains(root, owner)
+        end
+        return directories[dir]
+    end
+end
+
 ---Fresh on-disk scan. Keep absolute paths so relative/trailing-slash project
 ---settings cannot accidentally be joined to the project directory twice.
 ---Skips the artifact directory (custom target-path or default target/),
@@ -178,6 +200,7 @@ end
 ---project root.
 local function each_yaml(project, exclude_target, callback)
     project = vim.fs.normalize(vim.fn.fnamemodify(project, ":p"))
+    local in_project = project_files(projects.layout(project))
     if exclude_target then exclude_target = vim.fs.normalize(vim.fn.fnamemodify(exclude_target, ":p")) end
     for _, pattern in ipairs { "**/*.yml", "**/*.yaml" } do
         for _, file in ipairs(vim.fn.globpath(project, pattern, false, true)) do
@@ -185,7 +208,7 @@ local function each_yaml(project, exclude_target, callback)
             if exclude_target then
                 under_target = under_target or file:sub(1, #exclude_target + 1) == exclude_target .. "/"
             end
-            if not under_target then
+            if not under_target and in_project(file) then
                 local ok, lines = pcall(vim.fn.readfile, file)
                 if ok then callback(file, lines) end
             end
@@ -343,7 +366,8 @@ end
 ---Apply yaml_flow_files: "" silences a file's issues; a model name also
 ---synthesizes a declaration so jumps resolve. Keys are absolute, or
 ---relative to the project directory first, then to Neovim's working
----directory. Warns once per session for entries matching no file.
+---directory, restricted to this project and its installed packages.
+---Warns once per session for in-scope entries matching no file.
 ---Returns filtered decls, issues.
 ---@param project string
 ---@param decls dbtpal.Declaration[]
@@ -352,35 +376,38 @@ end
 function M.apply_flow_config(project, decls, issues)
     local mapping = config.options.yaml_flow_files or {}
     if next(mapping) == nil then return decls, issues end
-    local root = vim.fs.normalize(vim.fn.fnamemodify(project, ":p"))
+    local layout = projects.layout(project)
+    local root = layout.root
+    local in_project = project_files(layout)
     local silenced, synthesized = {}, {}
     for key, model in pairs(mapping) do
         local file = nil
         if key:match "^/" or key:match "^%a:[/\\]" then
             file = vim.fs.normalize(key)
         else
-            -- Accept keys relative to the project directory or to Neovim's
-            -- working directory; first readable hit wins.
+            -- A cwd fallback must not import another project's declaration.
             for _, base in ipairs { root, vim.fn.getcwd() } do
                 local candidate = vim.fs.normalize(vim.fs.joinpath(base, key))
-                if vim.fn.filereadable(candidate) == 1 then
+                if in_project(candidate) and vim.fn.filereadable(candidate) == 1 then
                     file = candidate
                     break
                 end
             end
             file = file or vim.fs.normalize(vim.fs.joinpath(root, key))
         end
-        if vim.fn.filereadable(file) ~= 1 then
-            if not warned_unmatched[file] then
-                warned_unmatched[file] = true
-                log.warn("dbtpal: yaml_flow_files entry has no such file: " .. key)
+        if in_project(file) then
+            if vim.fn.filereadable(file) ~= 1 then
+                if not warned_unmatched[file] then
+                    warned_unmatched[file] = true
+                    log.warn("dbtpal: yaml_flow_files entry has no such file: " .. key)
+                end
+            elseif model == "" then
+                silenced[file] = true
+            elseif type(model) == "string" and model ~= "" then
+                silenced[file] = true
+                synthesized[#synthesized + 1] =
+                    { kind = "models", name = model, file = file, lnum = locate_name(file, model), user_config = true }
             end
-        elseif model == "" then
-            silenced[file] = true
-        elseif type(model) == "string" and model ~= "" then
-            silenced[file] = true
-            synthesized[#synthesized + 1] =
-                { kind = "models", name = model, file = file, lnum = locate_name(file, model), user_config = true }
         end
     end
     if next(silenced) == nil then return decls, issues end
@@ -407,6 +434,7 @@ end
 ---@param project string
 ---@param issues dbtpal.FlowIssue[]?
 function M.report(project, issues)
+    project = paths.absolute(project)
     issues = issues or {}
     local hash = vim.fn.sha256(vim.json.encode(issues))
     local path = report_path(project)
@@ -419,6 +447,7 @@ function M.report(project, issues)
     if cached_hash == hash then return end
     vim.fn.writefile({ vim.json.encode { hash = hash, issues = issues } }, path)
     if config.options.use_quickfix then
+        local qf_context = { dbtpal_project = project }
         if #issues > 0 then
             local items = {}
             for _, issue in ipairs(issues) do
@@ -429,10 +458,13 @@ function M.report(project, issues)
                     type = "W",
                 }
             end
-            vim.fn.setqflist({}, " ", { title = "dbt yaml", items = items })
+            vim.fn.setqflist({}, " ", { title = "dbt yaml", items = items, context = qf_context })
             log.info(#items .. " YAML location(s) need attention; use :copen to view")
-        elseif vim.fn.getqflist({ title = 1 }).title == "dbt yaml" then
-            vim.fn.setqflist({}, "r", { title = "dbt yaml", items = {} })
+        else
+            local current = vim.fn.getqflist { title = 1, context = 1 }
+            if current.title == "dbt yaml" and vim.deep_equal(current.context, qf_context) then
+                vim.fn.setqflist({}, "r", { title = "dbt yaml", items = {}, context = qf_context })
+            end
         end
     elseif #issues > 0 then
         log.info("dbtpal: " .. #issues .. " YAML location(s) need attention; details in " .. path)

@@ -56,13 +56,13 @@ vim.api.nvim_create_user_command("Dbt", function(cmd)
         return
     end
     local model_commands = { run = true, test = true, compile = true, build = true }
-    if config.options.use_current_model and model_commands[command] and not has_selector(args) then
+    if model_commands[command] and not has_selector(args) then
         local model = context.require_model_buffer()
         if not model then return end
         vim.list_extend(args, { "--select", model })
     end
-    main.run_command(command, args, cmd.bang and "float" or nil)
-end, { nargs = "*", bang = true })
+    main.run_command(command, args, nil)
+end, { nargs = "*" })
 
 vim.api.nvim_create_user_command("DbtSelectModels", function() workflows.select_models() end, { nargs = 0 })
 

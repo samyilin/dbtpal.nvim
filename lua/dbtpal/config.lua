@@ -10,19 +10,16 @@ local M = {}
 ---@field path_to_dbt_profiles_dir string?
 ---@field path_to_dbt_target string?
 ---@field path_to_dbt_packages string?
----@field include_profiles_dir boolean?
 ---@field include_project_dir boolean?
 ---@field include_log_level boolean?
 ---@field custom_dbt_syntax_enabled boolean?
 ---@field extended_path_search boolean?
 ---@field protect_compiled_files boolean?
 ---@field picker_backend string?
----@field use_current_model boolean?
----@field output_mode string?
+---@field output string?
 ---@field exclude_packages string[]?
 ---@field use_quickfix boolean?
 ---@field yaml_flow_files table<string, string>?
----@field stream_output boolean?
 ---@field float_border string?
 ---@field float_width number?
 ---@field float_height number?
@@ -39,7 +36,6 @@ M.defaults = {
     path_to_dbt_target = "",
     path_to_dbt_packages = "",
 
-    include_profiles_dir = true,
     include_project_dir = true,
     include_log_level = true,
 
@@ -47,8 +43,9 @@ M.defaults = {
     extended_path_search = true,
     protect_compiled_files = true,
     picker_backend = "default",
-    use_current_model = true,
-    output_mode = "float",
+    -- Output presentation: "notify" stays quiet on success, "float" opens
+    -- output on exit, "stream" opens at job start with live output.
+    output = "float",
 
     -- Package names (dbt ls `package_name`) hidden from model pickers
     -- and graph walk listings, e.g. { "dbt_utils", "snowplow" }.
@@ -62,10 +59,6 @@ M.defaults = {
     -- the file in the unparsed-YAML report; a model name synthesizes a
     -- declaration for jumps, e.g. { ["models/legacy.yml"] = "orders" }.
     yaml_flow_files = {},
-
-    -- Stream dbt output into the floating window while the job runs
-    -- instead of showing it only on exit.
-    stream_output = false,
 
     -- Floating output style. Width/height are fractions of the editor
     -- when in (0, 1], or absolute cells when greater than 1.
@@ -83,6 +76,8 @@ M.defaults = {
 M.options = {}
 
 local float_borders = { none = true, single = true, double = true, rounded = true, solid = true, shadow = true }
+
+local valid_outputs = { notify = true, float = true, stream = true }
 
 ---Validate float style on load: unknown values warn and fall back.
 local function validate_float(border, width, height)
@@ -105,9 +100,26 @@ function M.setup(options)
     M.options = vim.tbl_deep_extend("force", M.defaults, options or {})
     M.options.float_border, M.options.float_width, M.options.float_height =
         validate_float(M.options.float_border, M.options.float_width, M.options.float_height)
+    for _, key in ipairs { "output_mode", "stream_output", "include_profiles_dir", "use_current_model" } do
+        if options and options[key] ~= nil then
+            log.warn("dbtpal: config option " .. key .. " was removed; see README for the replacement")
+        end
+    end
+    if type(M.options.output) ~= "string" or not valid_outputs[M.options.output] then
+        log.warn "dbtpal: unknown output, using default"
+        M.options.output = M.defaults.output
+    end
     local project = paths.normalize(M.options.path_to_dbt_project)
     if not project then log.warn "Ignoring non-filesystem path_to_dbt_project, using auto-detection" end
     M.options.path_to_dbt_project = project or ""
+    if M.options.path_to_dbt_project ~= "" then
+        M.options.path_to_dbt_project = paths.absolute(M.options.path_to_dbt_project)
+        local marker = vim.fs.joinpath(M.options.path_to_dbt_project, "dbt_project.yml")
+        if vim.fn.filereadable(marker) ~= 1 then
+            log.warn "path_to_dbt_project has no dbt_project.yml; using auto-detection"
+            M.options.path_to_dbt_project = ""
+        end
+    end
     M.options.path_to_dbt_profiles_dir = paths.normalize(M.options.path_to_dbt_profiles_dir)
         or M.defaults.path_to_dbt_profiles_dir
     require("dbtpal.files").setup()

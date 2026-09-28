@@ -1,6 +1,7 @@
 local graph = require "dbtpal.graph"
 local graph_cache = require "dbtpal.graph_cache"
 local main = require "dbtpal.main"
+local config = require "dbtpal.config"
 local resources = require "dbtpal.resources"
 local selectors = require "dbtpal.selectors"
 local picker = require "dbtpal.picker"
@@ -13,7 +14,7 @@ local goto_nav = require "dbtpal.goto"
 local M = {}
 
 local function require_project()
-    local project = graph_cache.project_dir() or context.project_for_buffer()
+    local project = context.project_for_buffer()
     if not project then log.warn "Could not detect dbt project dir" end
     return project
 end
@@ -23,7 +24,7 @@ end
 local function list_models(project, callback)
     graph_cache.load(project, function(index, err)
         if err then
-            resources.list({ resource_type = "model" }, function(items, list_err)
+            resources.list({ resource_type = "model", project = project }, function(items, list_err)
                 if list_err then
                     callback(nil, list_err.stderr ~= "" and list_err.stderr or "Unable to list dbt models")
                     return
@@ -93,18 +94,19 @@ function M.is_tagged(tagged, entry)
     return false
 end
 
-local function execute_with_output(operation, select_value, on_cancel)
+local function execute_with_output(project, operation, select_value, on_cancel)
     vim.ui.select({ "Notify only", "Open full output" }, {
         prompt = "Show dbt output?",
-    }, function(output_mode)
-        if not output_mode then
+    }, function(choice)
+        if not choice then
             if on_cancel then on_cancel() end
             return
         end
         main.run_command(
             operation,
             { "--select", select_value },
-            output_mode == "Open full output" and "float" or "notify"
+            choice == "Open full output" and (config.options.output == "stream" and "stream" or "float") or "notify",
+            project
         )
     end)
 end
@@ -131,7 +133,7 @@ local function walk_act(project, index, item, center, trail, dist, tagged)
             projects.open_resource(project, item, index.layout)
             return
         end
-        execute_with_output(action, selectors.from_resource(item))
+        execute_with_output(project, action, selectors.from_resource(item))
     end)
 end
 
@@ -179,7 +181,7 @@ tagged_operate = function(project, index, tagged, on_cancel)
             if opened == 0 then log.warn "No tagged models have file paths" end
             return
         end
-        execute_with_output(operation, table.concat(selectors.from_resources(tagged), " "), on_cancel)
+        execute_with_output(project, operation, table.concat(selectors.from_resources(tagged), " "), on_cancel)
     end)
 end
 
@@ -270,10 +272,8 @@ walk_loop = function(project, index, center, trail, dist, tagged)
     end
 end
 
-local function walk_begin(reference, opts)
+local function walk_begin(project, reference, opts)
     opts = opts or {}
-    local project = require_project()
-    if not project then return end
     graph_cache.load(project, function(index, err)
         if err then
             log.error(err)
@@ -313,8 +313,10 @@ local function walk_begin(reference, opts)
 end
 
 function M.walk(start)
+    local project = require_project()
+    if not project then return end
     if start and start ~= "" then
-        walk_begin(start)
+        walk_begin(project, start)
         return
     end
     local model = context.current_model()
@@ -324,6 +326,7 @@ function M.walk(start)
             properties.declaration_at(vim.api.nvim_buf_get_lines(0, 0, -1, false), vim.api.nvim_win_get_cursor(0)[1])
         if decl then
             walk_begin(
+                project,
                 decl.name,
                 { kind = decl.kind:sub(1, -2), dataset = decl.dataset, file = vim.api.nvim_buf_get_name(0) }
             )
@@ -331,11 +334,9 @@ function M.walk(start)
         end
     end
     if model then
-        walk_begin(model, { file = vim.api.nvim_buf_get_name(0), kind = filetype == "csv" and "seed" or nil })
+        walk_begin(project, model, { file = vim.api.nvim_buf_get_name(0), kind = filetype == "csv" and "seed" or nil })
         return
     end
-    local project = require_project()
-    if not project then return end
     list_models(project, function(items, err)
         if err then
             log.error(err)
@@ -347,7 +348,7 @@ function M.walk(start)
         end
         picker.select({ items = items, prompt = "Walk from", format_item = graph.label }, function(item)
             if not item then return end
-            walk_begin(item.unique_id)
+            walk_begin(project, item.unique_id)
         end)
     end)
 end
@@ -387,7 +388,7 @@ function M.select_models()
                     function(operation)
                         if not operation then return end
                         local selected_ids = selectors.from_resources(selected)
-                        execute_with_output(operation, table.concat(selected_ids, " "))
+                        execute_with_output(project, operation, table.concat(selected_ids, " "))
                     end
                 )
             end

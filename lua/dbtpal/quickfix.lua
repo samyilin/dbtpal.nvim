@@ -1,5 +1,6 @@
 local config = require "dbtpal.config"
 local log = require "dbtpal.log"
+local paths = require "dbtpal.paths"
 
 local M = {}
 
@@ -25,12 +26,16 @@ function M.publish(command, result, project)
     if not config.options.use_quickfix or (command ~= "test" and command ~= "build") then return end
     result = result or {}
     local title = "dbt " .. command
+    local qf_context = { dbtpal_project = paths.absolute(project) }
     local entries = M.parse(vim.split((result.stdout or "") .. "\n" .. (result.stderr or ""), "\n"), project)
     if #entries > 0 then
-        vim.fn.setqflist({}, " ", { title = title, items = entries })
+        vim.fn.setqflist({}, " ", { title = title, items = entries, context = qf_context })
         log.info(#entries .. " failure(s) sent to quickfix; use :copen to view")
-    elseif result.code == 0 and vim.fn.getqflist({ title = 1 }).title == title then
-        vim.fn.setqflist({}, "r", { title = title, items = {} })
+    elseif result.code == 0 then
+        local current = vim.fn.getqflist { title = 1, context = 1 }
+        if current.title == title and vim.deep_equal(current.context, qf_context) then
+            vim.fn.setqflist({}, "r", { title = title, items = {}, context = qf_context })
+        end
     end
 end
 

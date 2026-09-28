@@ -23,13 +23,16 @@ function M.setup()
             group = group,
             pattern = { "*.sql", "*.yml", "*.yaml", "*.md" },
             callback = function(ev)
-                vim.opt_local.suffixesadd:append ".sql"
-                if not projects.detect_dbt_project_dir(ev.file) then return end
-                local current = vim.opt_local.path:get()
-                for _, suffix in ipairs { "/macros/**", "/models/**" } do
-                    local entry = config.options.path_to_dbt_project .. suffix
-                    if not vim.tbl_contains(current, entry) then vim.opt_local.path:append(entry) end
-                end
+                vim.api.nvim_buf_call(ev.buf, function()
+                    vim.opt_local.suffixesadd:append ".sql"
+                    local project = projects.resolve(vim.api.nvim_buf_get_name(ev.buf))
+                    if not project then return end
+                    local current = vim.opt_local.path:get()
+                    for _, suffix in ipairs { "/macros/**", "/models/**" } do
+                        local entry = project .. suffix
+                        if not vim.tbl_contains(current, entry) then vim.opt_local.path:append(entry) end
+                    end
+                end)
             end,
             desc = "Look for gf targets within dbt project folders",
         })

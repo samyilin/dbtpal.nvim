@@ -54,7 +54,7 @@ function M.list(opts, callback)
             resources[#resources + 1] = resource
         end
         callback(M.excluding(resources), nil)
-    end)
+    end, { project = opts.project })
 end
 
 return M

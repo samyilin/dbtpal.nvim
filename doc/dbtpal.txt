@@ -1,4 +1,4 @@
-*dbtpal.txt*           For NVIM v0.8.0          Last change: 2026 September 19
+*dbtpal.txt*                For                 Last change: 2026 September 27
 
 ==============================================================================
 Table of Contents                                   *dbtpal-table-of-contents*
@@ -72,7 +72,7 @@ and in the container:
         path_to_dbt = "docker",
         pre_cmd_args = { "exec", "my-dbt-container", "dbt" },
         path_to_dbt_project = "/repo",
-        stream_output = true,
+        output = "stream",
     })
 <
 
@@ -111,7 +111,6 @@ Install using your favorite plugin manager:
                 path_to_dbt_profiles_dir = vim.fn.expand("~/.dbt"),
     
                 -- flags to include in dbt command
-                include_profiles_dir = true, -- --profiles-dir
                 include_project_dir = true, -- --project-dir
                 include_log_level = true, -- --log-level=INFO
     
@@ -130,20 +129,15 @@ Install using your favorite plugin manager:
                 -- Push failed-test locations to the quickfix list
                 use_quickfix = false,
     
-                -- Stream dbt output live instead of showing it only on exit
-                stream_output = false,
-    
                 -- Floating window style: named border; width/height are editor
                 -- fractions in (0, 1] or absolute cells when greater than 1
                 float_border = "double",
                 float_width = 0.8,
                 float_height = 0.8,
     
-                -- Auto-select the current model for run/test/compile/build
-                use_current_model = true,
-    
-                -- Output mode: "float" or "notify"
-                output_mode = "float",
+                -- Output: "notify" stays quiet on success, "float" opens output
+                -- on exit, "stream" opens at job start with live output
+                output = "float",
     
                 -- additional flags to include at the beginning of the rendered dbt command
                 pre_cmd_args = {},
@@ -179,12 +173,27 @@ Install using your favorite plugin manager:
 
 COMMANDS                                         *dbtpal-dbtpal.nvim-commands*
 
-An explicit `path_to_dbt_project` takes precedence. Otherwise the first
-successful project discovery, on a relevant buffer read or command, is reused
-for the session. Opening another project does not switch it. Call `setup()`
-again with the new project path and your other settings to switch. Local
-`oil://` directory names are normalized; other virtual URI names are excluded
-from project discovery.
+A "project directory" is always the dbt directory itself: the nearest ancestor
+containing `dbt_project.yml`, so nested projects resolve to the nearest one. An
+explicit `path_to_dbt_project` must point at such a directory (setup warns and
+falls back to auto-detection otherwise) and takes precedence for every buffer.
+Otherwise each buffer resolves to its own project on use — opening another
+project’s files just works, with no `setup()` recall. Buffers outside any dbt
+project warn and abort the command. Local `oil://` directory names are
+normalized; other virtual URI names are excluded from project discovery.
+
+Commands and pickers capture their project when opened, so switching buffers
+while a picker or dbt job is pending keeps that operation attached to its
+original project. A relative `path_to_dbt_project` is anchored at `setup()`
+time. An unnamed buffer uses Neovim’s current working directory for
+discovery.
+
+Configuration is shared across projects: the executable, profiles, `env`, CLI
+arguments, and lookup overrides all come from the same `setup()`. With empty
+lookup overrides, each project’s `dbt_project.yml` supplies its own target
+and package directories. Automatic CLI routing uses the generated
+`--project-dir`; disabling `include_project_dir` or supplying that flag
+yourself gives control to your CLI arguments or wrapper.
 
 
 DBT ~
@@ -200,23 +209,23 @@ forwarded to dbt as an argument list:
     :Dbt debug
 <
 
-With no arguments, `:Dbt` shows usage. `:Dbt!` forces floating output.
+With no arguments, `:Dbt` shows usage. Output follows `output` (below); one-off
+overrides go through the Lua API, e.g. `require("dbtpal").run_command("run",
+{"--select", "orders"}, "notify")`.
 
-When `use_current_model` is enabled (the default), `run`, `test`, `compile`,
-and `build` add the current resource name unless an explicit `--select`/`-s`,
-`--models`/`-m`, or `--selector` is given. Both `--select name` and
-`--select=name` work. SQL/dbt and CSV buffers use the filename; YAML buffers
-use the word under the cursor. Other buffers warn and abort. Use `--select *`
-for an explicit whole-project run; arguments use Neovim command escaping, not
-shell quoting or glob expansion.
+`run`, `test`, `compile`, and `build` add the current resource name unless an
+explicit `--select`/`-s`, `--models`/`-m`, or `--selector` is given. Both
+`--select name` and `--select=name` work. SQL/dbt and CSV buffers use the
+filename; YAML buffers use the word under the cursor. Other buffers warn and
+abort. Use `--select *` for an explicit whole-project run; arguments use Neovim
+command escaping, not shell quoting or glob expansion.
 
-With `output_mode = "notify"`, successful commands only notify while failures
-still open the detailed floating output.
-
-Set `stream_output = true` to open floating output at job start and show stdout
-and stderr as they arrive. This also applies to picker/walk actions when you
-choose **Open full output**. Notify-only mode stays quiet until completion.
-Pressing `q` closes the float without cancelling the process.
+With `output = "notify"`, successful commands only notify while failures still
+open the detailed floating output. With `output = "stream"`, floating output
+opens at job start and shows stdout and stderr as they arrive. This also
+applies to picker/walk actions when you choose **Open full output**.
+Notify-only mode stays quiet until completion. Pressing `q` closes the float
+without cancelling the process.
 
 Style the float with `float_border` (`none`, `single`, `double`, `rounded`,
 `solid`, `shadow`), `float_width`, and `float_height`. Dimensions in (0, 1]
@@ -258,7 +267,7 @@ and seed (CSV) buffers, plus YAML files (schema, sources, exposures) via the
 word under the cursor. Each step lists the direct upstream (`↑`) dependencies
 and downstream (`↓`) dependents — models, seeds, snapshots, and sources —
 plus `.. back`, each annotated with its shortest-path distance from where the
-walk started (e.g. `↑ raw (+1)`). Resources sharing a bare name are listed
+walk started (e.g.� `↑ raw (+1)`). Resources sharing a bare name are listed
 separately with qualified labels (`package.name`, `source:dataset.table`);
 stepping in, tagging, and run/test/compile/build all track the exact resource,
 and multi-model actions select it unambiguously. Each step also offers a `·
@@ -287,7 +296,7 @@ typing a command:
 Graph-backed resolution uses `target/manifest.json`, falling back to `dbt ls`,
 with a cache refreshed when the manifest changes. The jump is bidirectional:
 
-- In SQL, `ref()` opens the referenced resource. `source('dataset',   'table')` prefers the table’s YAML declaration, falling back to the
+- In SQL, `ref()` opens the referenced resource. `source('dataset', 'table')` prefers the table’s YAML declaration, falling back to the
     graph with the same dataset qualifier. Missing datasets never resolve
     to a different dataset with the same table name.
 - With no `ref()`/`source()` on the line, a model/seed buffer opens its
@@ -301,7 +310,8 @@ with a cache refreshed when the manifest changes. The jump is bidirectional:
 - Multiple matching declarations or resource definitions offer a picker.
 
 YAML lookup scans saved `*.yml`/`*.yaml` files outside the target directory on
-each jump. Files recorded by the manifest (`patch_path` and YAML
+each jump. Independent nested dbt projects are excluded; installed packages
+remain included. Files recorded by the manifest (`patch_path` and YAML
 `original_file_path`s) are trusted for discovery; the scan still covers the
 rest, since undocumented resources leave no manifest trace. The scanner
 recognizes block-style declarations with a literal `name:` key, in any key
@@ -311,10 +321,22 @@ is skipped rather than misresolved. Single-line flow-style mappings (`models:
 instead — the quickfix list when `use_quickfix` is set, otherwise a cache
 file plus a notification. Map such files in `yaml_flow_files` to silence them
 (`""`) or to resolve jumps to a named model (`"model"`); keys resolve against
-the project directory, then the working directory. Unknown entries warn once
-per session. Mapped models are verified against the on-disk graph cache once
-per manifest state — verification never runs dbt, and defers silently without
-a cache — and resolve with a `(user config)` mark in picker labels.
+the project directory, then the working directory. Only files belonging to the
+selected project or its installed packages apply; mappings into other projects
+are ignored. Missing in-project files warn once per session. A relative key
+applies in every project with that file. Use absolute keys when the two
+projects need different mappings:
+
+>lua
+    yaml_flow_files = {
+        ["/work/repo-a/models/legacy.yml"] = "orders",
+        ["/work/repo-b/models/legacy.yml"] = "", -- silence only in repo-b
+    }
+<
+
+Mapped models are verified against the on-disk graph cache once per manifest
+state — verification never runs dbt, and defers silently without a cache —
+and resolve with a `(user config)` mark in picker labels.
 
 File opens resolve against the owning package: manifest paths are joined to the
 installed package directory (honoring `packages-install-path`), and the
@@ -358,6 +380,11 @@ loop. Optional `opts.on_chunk(data, stream)` receives live chunks on the same
 loop (`stream` is `"stdout"` or `"stderr"`); complete output is still returned
 at exit. `run_command()` and `execute()` return a `vim.SystemObj` on successful
 launch, which Lua callers can cancel with `:kill(15)`.
+
+`execute()` and `list_resources()` resolve the current buffer’s project at
+invocation. Pass `opts.project = "/work/repo-a"` to capture a project
+explicitly in an integration. `run_command(command, args, output, project)`
+accepts the same override as its optional fourth argument.
 
 
 PICKERS                                           *dbtpal-dbtpal.nvim-pickers*
@@ -429,9 +456,6 @@ The following options are available:
   protect_compiled_files      Prevent modifying sql files in   true
                               target/(compiled|run) folders    
 
-  include_profiles_dir        Include --profiles-dir flag in   true
-                              dbt command                      
-
   include_project_dir         Include --project-dir flag in    true
                               dbt command                      
 
@@ -453,8 +477,9 @@ The following options are available:
                               (verified once per manifest;     
                               marked user config)              
 
-  stream_output               Stream dbt output live in the    false
-                              float instead of only on exit    
+  output                      "notify" quiet on success;       "float"
+                              "float" opens on exit; "stream"  
+                              opens at start, live             
 
   float_border                Floating window border style     "double"
 
@@ -470,12 +495,6 @@ The following options are available:
   env                         Environment overrides for dbt    {}
                               subprocesses (inherits the host  
                               environment)                     
-
-  use_current_model           Auto-select the current model    true
-                              when no selector is given        
-
-  output_mode                 "float" opens output always;     "float"
-                              "notify" stays quiet on success  
 
   pre_cmd_args                Additional flags at the          {}
                               beginning of the rendered dbt    
@@ -524,7 +543,7 @@ as proposed:
 - Directly addressed: `oil://` project dir (#32 <https://github.com/PedramNavid/dbtpal/issues/32>), package filtering
     via `exclude_packages` (#10 <https://github.com/PedramNavid/dbtpal/issues/10>), quickfix via `use_quickfix` (#9 <https://github.com/PedramNavid/dbtpal/issues/9>),
     bidirectional YAML jumps (#6 <https://github.com/PedramNavid/dbtpal/issues/6>), Docker usage (see above, #15 <https://github.com/PedramNavid/dbtpal/issues/15>),
-    and live output via `stream_output` (#12 <https://github.com/PedramNavid/dbtpal/issues/12>).
+    and live output via `output = "stream"` (#12 <https://github.com/PedramNavid/dbtpal/issues/12>).
 
 
 DEVELOPMENT                                   *dbtpal-dbtpal.nvim-development*

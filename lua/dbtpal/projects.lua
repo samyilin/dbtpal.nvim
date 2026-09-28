@@ -144,20 +144,21 @@ end
 ---@param fpath string?
 ---@return string?
 local function find_project_dir(fpath)
-    if fpath == nil then fpath = vim.fn.expand "%:p:h" end
+    if fpath == nil then fpath = vim.api.nvim_buf_get_name(0) end
     fpath = M.normalize_path(fpath)
     if fpath == nil then
         log.debug "Cannot detect dbt project dir from a virtual buffer"
         return nil
     end
-    log.debug("Searching for dbt project dir in " .. fpath)
-    local path = vim.fn.expand(vim.fn.fnamemodify(fpath, ":p"))
-    local dbt_project = vim.fn.findfile("dbt_project.yml", path .. ";")
-    if dbt_project == "" then
+    local path = paths.absolute(fpath)
+    if vim.fn.isdirectory(path) ~= 1 then path = vim.fs.dirname(path) end
+    log.debug("Searching for dbt project dir in " .. path)
+    local dbt_project = vim.fs.find("dbt_project.yml", { path = path, upward = true, type = "file" })[1]
+    if not dbt_project then
         log.debug("No dbt project found in " .. path)
         return nil
     end
-    local found_path = vim.fn.fnamemodify(dbt_project, ":p:h")
+    local found_path = vim.fs.dirname(dbt_project)
     log.debug("dbt project found in " .. found_path)
     return found_path
 end
@@ -165,19 +166,15 @@ end
 ---Filesystem lookup without changing configuration: path or nil.
 M.find_project_dir = find_project_dir
 
+---Resolve the dbt project for a buffer path without touching global
+---config: an explicit path_to_dbt_project wins, otherwise search upward.
+---Keep discovery fresh when cwd or project markers change during a session.
 ---@param bpath string?
----@return boolean
-M.detect_dbt_project_dir = function(bpath)
-    log.debug "path_to_dbt is not set, attempting to autofind."
-    -- Never clobber a manually configured project: opening a buffer in
-    -- another project must not repoint every subsequent dbt command.
-    if config.options.path_to_dbt_project ~= "" then return true end
-    local found = find_project_dir(bpath)
-    if found ~= nil then
-        config.options.path_to_dbt_project = found
-        return true
-    end
-    return false
+---@return string?
+function M.resolve(bpath)
+    local project = config.options.path_to_dbt_project
+    if project and project ~= "" then return paths.absolute(project) end
+    return find_project_dir(bpath)
 end
 
 return M

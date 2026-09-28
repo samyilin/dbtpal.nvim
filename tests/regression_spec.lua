@@ -27,24 +27,33 @@ before_each(
             path_to_dbt = "/bin/sh",
             pre_cmd_args = { fixture },
             path_to_dbt_project = project_root .. "/tests/dbt_project",
+            path_to_dbt_profiles_dir = "",
             include_project_dir = false,
-            include_profiles_dir = false,
             include_log_level = false,
         }
     end
 )
 
 it("preserves default paths and the caller's table in partial setup", function()
-    local opts = { stream_output = true }
+    local opts = { output = "stream" }
     config.setup(opts)
     check_equal("", config.options.path_to_dbt_project)
     check_equal(vim.fn.expand "~/.dbt", config.options.path_to_dbt_profiles_dir)
-    check_same({ stream_output = true }, opts)
-    config.setup { path_to_dbt_project = "oil:///project", extended_path_search = false }
-    check_equal("/project", config.options.path_to_dbt_project)
-    local count = #vim.api.nvim_get_autocmds { group = "dbtPal" }
-    config.setup { path_to_dbt_project = "oil:///project", extended_path_search = false }
-    check_equal(count, #vim.api.nvim_get_autocmds { group = "dbtPal" })
+    check_same({ output = "stream" }, opts)
+    local root = vim.fn.resolve(vim.fn.tempname())
+    vim.fn.mkdir(root .. "/proj/models", "p")
+    vim.fn.writefile({ "name: proj" }, root .. "/proj/dbt_project.yml")
+    local ok, err = xpcall(function()
+        config.setup { path_to_dbt_project = "oil://" .. root .. "/proj", extended_path_search = false }
+        check_equal(root .. "/proj", config.options.path_to_dbt_project)
+        local count = #vim.api.nvim_get_autocmds { group = "dbtPal" }
+        config.setup { path_to_dbt_project = "oil://" .. root .. "/proj", extended_path_search = false }
+        check_equal(count, #vim.api.nvim_get_autocmds { group = "dbtPal" })
+        config.setup { path_to_dbt_project = root .. "/no-such-dir", extended_path_search = false }
+        check_equal("", config.options.path_to_dbt_project)
+    end, debug.traceback)
+    vim.fn.delete(root, "rf")
+    if not ok then error(err) end
 end)
 
 it("validates float styling on setup", function()
@@ -58,6 +67,19 @@ it("validates float styling on setup", function()
     check_equal("double", config.options.float_border)
     check_equal(0.8, config.options.float_width)
     check_equal(0.8, config.options.float_height)
+end)
+
+it("validates output and warns on removed options", function()
+    local warnings = {}
+    with_stubs({
+        { require "dbtpal.log", "warn", function(msg) warnings[#warnings + 1] = msg end },
+    }, function()
+        -- Intentionally invalid input: exercises the runtime validation fallback.
+        ---@diagnostic disable-next-line: assign-type-mismatch
+        config.setup { output = "loud", output_mode = "float", stream_output = true }
+        check_equal("float", config.options.output)
+    end)
+    check_equal(3, #warnings)
 end)
 
 it("opens floating output with configured dimensions", function()
@@ -101,7 +123,6 @@ end)
 
 it("keeps explicit CLI flags and selectors without appending defaults", function()
     config.options.include_project_dir = true
-    config.options.include_profiles_dir = true
     local _, args = require("dbtpal.commands").build_path_args("run", {
         "--project-dir=/override",
         "--profiles-dir",
@@ -114,8 +135,8 @@ it("keeps explicit CLI flags and selectors without appending defaults", function
         function()
             vim.bo.filetype = "text"
             for _, selector in ipairs { "--select=orders", "--selector=daily", "-sorders" } do
-                vim.cmd("Dbt! run " .. selector)
-                check_same({ "run", { selector }, "float" }, captured)
+                vim.cmd("Dbt run " .. selector)
+                check_same({ "run", { selector } }, captured)
             end
         end
     )
@@ -184,8 +205,8 @@ it("retains failure details in notify mode and quickfix in streaming mode", func
         check_true(popup:find("stdout progress", 1, true))
         check_true(popup:find("stderr details", 1, true))
         popup = nil
-        config.options.stream_output = true
-        main.run_command("test", {}, "float")
+        config.options.output = "stream"
+        main.run_command("test", {}, "stream")
         check_true(vim.wait(3000, function() return finished end))
         check_true(popup == nil, "streaming should not open a second float")
         local output = table.concat(chunks)
@@ -256,7 +277,7 @@ it("routes picker operations through the same live output path", function()
     local picker = require "dbtpal.picker"
     local model = { name = "orders", resource_type = "model", unique_id = "model.project.orders" }
     local finished, chunks = false, {}
-    config.options.stream_output = true
+    config.options.output = "stream"
     with_stubs({
         {
             require "dbtpal.graph_cache",
