@@ -29,6 +29,8 @@ local function has_flag(args, flag)
     return false
 end
 
+local warned_missing_dirs = {}
+
 ---@param project string? Explicit project dir; falls back to global config.
 M.build_path_args = function(cmd, args, project)
     log.debug("dbtpal config: " .. vim.inspect(config.options))
@@ -51,8 +53,15 @@ M.build_path_args = function(cmd, args, project)
     end
 
     if dbt_profile and dbt_profile ~= "" and not supplied "--profiles-dir" then
-        table.insert(post_cmd_args, "--profiles-dir")
-        table.insert(post_cmd_args, dbt_profile)
+        if vim.fn.isdirectory(dbt_profile) == 1 then
+            table.insert(post_cmd_args, "--profiles-dir")
+            table.insert(post_cmd_args, dbt_profile)
+        elseif not warned_missing_dirs[dbt_profile] then
+            -- dbt aborts on a missing --profiles-dir; fail open so its own
+            -- resolution (project profiles.yml, DBT_PROFILES_DIR) applies.
+            warned_missing_dirs[dbt_profile] = true
+            log.warn("dbtpal: profiles dir does not exist, skipping --profiles-dir: " .. dbt_profile)
+        end
     end
 
     if include_project_dir and dbt_project and dbt_project ~= "" and not supplied "--project-dir" then

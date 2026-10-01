@@ -121,6 +121,23 @@ it("uses the configured version command and compares 1.10 correctly", function()
     end)
 end)
 
+it("skips --profiles-dir when the directory is missing", function()
+    config.options.path_to_dbt_profiles_dir = "/dbtpal-no-such-profiles-dir"
+    local warnings = {}
+    with_stubs({
+        { require "dbtpal.log", "warn", function(msg) warnings[#warnings + 1] = msg end },
+    }, function()
+        for _ = 1, 2 do
+            local _, args = require("dbtpal.commands").build_path_args("run", {})
+            check_true(not vim.tbl_contains(args, "--profiles-dir"))
+        end
+    end)
+    check_equal(1, #warnings)
+    config.options.path_to_dbt_profiles_dir = project_root .. "/tests/dbt_project"
+    local _, args = require("dbtpal.commands").build_path_args("run", {})
+    check_true(vim.tbl_contains(args, "--profiles-dir"))
+end)
+
 it("keeps explicit CLI flags and selectors without appending defaults", function()
     config.options.include_project_dir = true
     local _, args = require("dbtpal.commands").build_path_args("run", {

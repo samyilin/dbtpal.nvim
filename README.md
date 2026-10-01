@@ -415,7 +415,7 @@ The following options are available:
 | ------                   | -----------                                                          | -------                |
 | path_to_dbt              | Path to the dbt executable                                           | `dbt`                  |
 | path_to_dbt_project      | Path to the dbt project                                              | `""` (auto-detect)     |
-| path_to_dbt_profiles_dir | Path to dbt profiles directory                                       | `"~/.dbt"`             |
+| path_to_dbt_profiles_dir | Path to dbt profiles directory (`""` disables the flag)                | `"~/.dbt"`             |
 | path_to_dbt_target       | Override for the manifest directory (reads `target-path` otherwise)  | `""` (auto-detect)     |
 | path_to_dbt_packages     | Override for installed packages (reads `packages-install-path`)      | `""` (auto-detect)     |
 | extended_path_search     | Search for ref/source files in macros and models folders             | `true`                 |
@@ -436,7 +436,10 @@ The following options are available:
 | post_cmd_args            | Additional flags at the end of the rendered dbt command              | `{}`                   |
 
 Generated project/profile/log-level flags are only added when not already
-supplied. Log-level support is detected using the configured executable
+supplied. A configured profiles directory that does not exist is skipped
+with a one-time warning, so dbt falls back to its own resolution (project
+`profiles.yml`, `DBT_PROFILES_DIR`). Log-level support is detected using
+the configured executable
 and `pre_cmd_args`, including Docker wrappers; the result is cached until
 that command or `env` configuration changes. Set `include_log_level = false`
 to skip the version probe and let dbt choose its logging level. The default
