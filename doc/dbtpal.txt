@@ -343,6 +343,13 @@ installed package directory (honoring `packages-install-path`), and the
 manifest is read from the configured `target-path`. Both can be overridden with
 `path_to_dbt_target` and `path_to_dbt_packages`.
 
+If a jump lands in the wrong place (project `models/` instead of the installed
+package, or a blank buffer), suspect the manifest before the jump code: a stale
+or wrong-target manifest — or the `dbt ls` fallback, whose rows lack
+`root_path` — resolves against the wrong package root. Check the node’s
+`package_name`/`root_path` in `target/manifest.json`, rebuild with the right
+target, and refresh.
+
 `DbtRefreshGraph` rebuilds the cached graph from existing artifacts; run dbt
 first if you need an updated manifest:
 
