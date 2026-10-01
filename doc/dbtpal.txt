@@ -1,4 +1,4 @@
-*dbtpal.txt*                For                 Last change: 2026 September 30
+*dbtpal.txt*            For NVIM v0.8.0           Last change: 2026 October 01
 
 ==============================================================================
 Table of Contents                                   *dbtpal-table-of-contents*
@@ -267,7 +267,7 @@ and seed (CSV) buffers, plus YAML files (schema, sources, exposures) via the
 word under the cursor. Each step lists the direct upstream (`↑`) dependencies
 and downstream (`↓`) dependents — models, seeds, snapshots, and sources —
 plus `.. back`, each annotated with its shortest-path distance from where the
-walk started (e.g.� `↑ raw (+1)`). Resources sharing a bare name are listed
+walk started (e.g. `↑ raw (+1)`). Resources sharing a bare name are listed
 separately with qualified labels (`package.name`, `source:dataset.table`);
 stepping in, tagging, and run/test/compile/build all track the exact resource,
 and multi-model actions select it unambiguously. Each step also offers a `·
@@ -296,7 +296,7 @@ typing a command:
 Graph-backed resolution uses `target/manifest.json`, falling back to `dbt ls`,
 with a cache refreshed when the manifest changes. The jump is bidirectional:
 
-- In SQL, `ref()` opens the referenced resource. `source('dataset', 'table')` prefers the table’s YAML declaration, falling back to the
+- In SQL, `ref()` opens the referenced resource. `source('dataset',   'table')` prefers the table’s YAML declaration, falling back to the
     graph with the same dataset qualifier. Missing datasets never resolve
     to a different dataset with the same table name.
 - With no `ref()`/`source()` on the line, a model/seed buffer opens its
@@ -351,7 +351,7 @@ first if you need an updated manifest:
 <
 
 The graph reflects whichever target built the manifest. Models gated by
-target-aware config (e.g.� `enabled = (target.name == "prod")`) are absent from
+target-aware config (e.g. `enabled = (target.name == "prod")`) are absent from
 dev-built manifests entirely — no picker, walk, or jump can see them. If `dbt
 ls --select <name>` is empty, check the target before suspecting the plugin:
 
