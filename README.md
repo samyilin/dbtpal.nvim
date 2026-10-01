@@ -329,6 +329,33 @@ run dbt first if you need an updated manifest:
 :DbtRefreshGraph
 ```
 
+The graph reflects whichever target built the manifest. Models gated by
+target-aware config (e.g. `enabled = (target.name == "prod")`) are absent
+from dev-built manifests entirely — no picker, walk, or jump can see them.
+If `dbt ls --select <name>` is empty, check the target before suspecting
+the plugin:
+
+```sh
+dbt ls --select <name> --target prod
+```
+
+To navigate prod-gated models, build with that target first, then refresh
+(the manifest is always the whole-project parse, so the auto-added
+`--select` is harmless):
+
+```vim
+:Dbt compile --target prod
+:DbtRefreshGraph
+```
+
+Note the graph is then a prod lens: dev-gated models disappear until you
+recompile with the dev target and refresh again. To change the default
+target, set `target: prod` in your profile in `profiles.yml`, or append it
+to every command with `post_cmd_args = { "--target", "prod" }` (an
+explicit `--target` still wins). This is unrelated to `path_to_dbt_target`,
+which is the artifacts directory. Defaulting to prod means `:Dbt run` and
+`:Dbt build` write production without further confirmation.
+
 ## Lua API
 
 ```lua
