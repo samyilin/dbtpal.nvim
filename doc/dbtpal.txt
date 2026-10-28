@@ -1,4 +1,4 @@
-*dbtpal.txt*            For NVIM v0.8.0           Last change: 2026 October 01
+*dbtpal.txt*            For NVIM v0.8.0           Last change: 2026 October 28
 
 ==============================================================================
 Table of Contents                                   *dbtpal-table-of-contents*
@@ -86,7 +86,7 @@ The image must provide `dbt` and `sleep`. Both `--project-dir` and
 client; to set variables inside the container, add `--env`, `"NAME=value"`
 after `"exec"` in `pre_cmd_args`. For `:Dbt docs serve`, publish its port with
 `docker run -p`; streaming displays its logs while the server runs. The output
-window is not an interactive terminal.
+window is a scratch buffer, not an interactive terminal.
 
 
 INSTALLATION                                 *dbtpal-dbtpal.nvim-installation*
@@ -225,7 +225,9 @@ open the detailed floating output. With `output = "stream"`, floating output
 opens at job start and shows stdout and stderr as they arrive. This also
 applies to picker/walk actions when you choose **Open full output**.
 Notify-only mode stays quiet until completion. Pressing `q` closes the float
-without cancelling the process.
+without cancelling the process. Output is a normal scratch buffer, not a
+terminal: long lines wrap on screen but stay whole, so yanking compiled SQL
+copies each line in full.
 
 Style the float with `float_border` (`none`, `single`, `double`, `rounded`,
 `solid`, `shadow`), `float_width`, and `float_height`. Dimensions in (0, 1]
