@@ -93,6 +93,30 @@ it("opens floating output with configured dimensions", function()
     vim.api.nvim_win_close(win, true)
 end)
 
+it("keeps long output lines whole so copying is not truncated", function()
+    config.setup { float_width = 40, float_height = 0.5 }
+    local display = require "dbtpal.display"
+    local long = string.rep("select col, ", 40) .. "from t"
+    local win, buf = display.popup { long, "short" }
+    local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+    check_equal(long, lines[1], "long line must stay one buffer line")
+    check_equal("short", lines[2])
+    vim.api.nvim_win_close(win, true)
+end)
+
+it("streams chunks into whole lines", function()
+    local display = require "dbtpal.display"
+    local stream = display.stream()
+    stream.push "select "
+    stream.push "a,\n"
+    stream.push "b\n"
+    stream.finish()
+    local lines = vim.api.nvim_buf_get_lines(stream.buf, 0, -1, false)
+    check_equal("select a,", lines[1])
+    check_equal("b", lines[2])
+    vim.api.nvim_win_close(stream.win, true)
+end)
+
 it("uses the configured version command and compares 1.10 correctly", function()
     local commands = require "dbtpal.commands"
     local calls, argv = 0, nil

@@ -64,7 +64,8 @@ The image must provide `dbt` and `sleep`. Both `--project-dir` and
 Docker client; to set variables inside the container, add `--env`,
 `"NAME=value"` after `"exec"` in `pre_cmd_args`. For `:Dbt docs serve`,
 publish its port with `docker run -p`; streaming displays its logs while
-the server runs. The output window is not an interactive terminal.
+the server runs. The output window is a scratch buffer, not an interactive
+terminal.
 
 ## Installation
 
@@ -202,6 +203,8 @@ floating output opens at job start and shows stdout and stderr as they
 arrive. This also applies to picker/walk actions
 when you choose **Open full output**. Notify-only mode stays quiet until
 completion. Pressing `q` closes the float without cancelling the process.
+Output is a normal scratch buffer, not a terminal: long lines wrap on screen
+but stay whole, so yanking compiled SQL copies each line in full.
 
 Style the float with `float_border` (`none`, `single`, `double`,
 `rounded`, `solid`, `shadow`), `float_width`, and `float_height`.
