@@ -117,6 +117,26 @@ it("streams chunks into whole lines", function()
     vim.api.nvim_win_close(stream.win, true)
 end)
 
+it("strips ANSI escapes from command output", function()
+    local display = require "dbtpal.display"
+    local win, buf = display.popup { "\27[0mRunning with dbt=1.11.6", "\27[31merror\27[0m: boom" }
+    local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+    check_equal("Running with dbt=1.11.6", lines[1])
+    check_equal("error: boom", lines[2])
+    vim.api.nvim_win_close(win, true)
+end)
+
+it("strips an ANSI sequence split across stream chunks", function()
+    local display = require "dbtpal.display"
+    local stream = display.stream()
+    stream.push "hello \27[3"
+    stream.push "1mred\27[0m\n"
+    stream.finish()
+    local lines = vim.api.nvim_buf_get_lines(stream.buf, 0, -1, false)
+    check_equal("hello red", lines[1])
+    vim.api.nvim_win_close(stream.win, true)
+end)
+
 it("uses the configured version command and compares 1.10 correctly", function()
     local commands = require "dbtpal.commands"
     local calls, argv = 0, nil

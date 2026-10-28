@@ -9,6 +9,18 @@ local function cells(total, value, margin)
     return math.max(1, math.ceil(total * value - (margin or 0)))
 end
 
+---Drop ANSI escape sequences so the scratch buffer shows plain text. dbt
+---forces color even when piped, so this is required. A trailing incomplete
+---sequence is withheld; the next chunk re-renders the whole line.
+local function strip_ansi(text)
+    text = text:gsub("\27%[[0-?]*[ -/]*[@-~]", "") -- CSI: SGR, cursor, erase
+    text = text:gsub("\27%][^\7\27]*\7", "") -- OSC terminated by BEL
+    text = text:gsub("\27%][^\7\27]*\27\\", "") -- OSC terminated by ST
+    local esc = text:find("\27", 1, true)
+    if esc then text = text:sub(1, esc - 1) end
+    return text
+end
+
 ---Open the floating console. follow=true keeps the cursor on the last line so
 ---live streams tail their output; popups stay at the top, like before.
 local function open_console(win_overrides, follow)
@@ -44,23 +56,26 @@ local function open_console(win_overrides, follow)
     -- rows at the window width, which truncated long lines on copy.
     vim.wo[win].wrap = true
 
-    -- Last buffer line, 1-based. Output arrives in chunks that can split lines.
+    -- Last buffer line, 1-based. Output arrives in chunks that can split lines
+    -- and even split an ANSI sequence, so keep the raw current line and
+    -- re-render it as chunks complete.
     local last = 1
-    local function read() return vim.api.nvim_buf_get_lines(buf, last - 1, last, false)[1] or "" end
+    local raw = ""
     local function write(text) vim.api.nvim_buf_set_lines(buf, last - 1, last, false, { text }) end
-    -- A carriage return rewrites the current line from column 0 (dbt progress).
-    local function apply(text)
-        local current = read()
+
+    -- A carriage return rewrites the visible line from column 0 (dbt progress).
+    local function render(line)
+        local current = ""
         local first = true
-        for _, segment in ipairs(vim.split(text, "\r", { plain = true })) do
+        for _, segment in ipairs(vim.split(strip_ansi(line), "\r", { plain = true })) do
             if first then
-                current = current .. segment
+                current = segment
                 first = false
             else
                 current = segment .. current:sub(#segment + 1)
             end
         end
-        write(current)
+        return current
     end
 
     local push = function(text)
@@ -68,12 +83,15 @@ local function open_console(win_overrides, follow)
         -- pcall: the user may quit the window mid-stream.
         pcall(function()
             text = text:gsub("\r\n", "\n")
-            for i, part in ipairs(vim.split(text, "\n", { plain = true })) do
-                if i > 1 then
+            local parts = vim.split(text, "\n", { plain = true })
+            for i, part in ipairs(parts) do
+                raw = raw .. part
+                write(render(raw))
+                if i < #parts then
                     last = last + 1
+                    raw = ""
                     write ""
                 end
-                if part ~= "" then apply(part) end
             end
             -- Output is scratch content, not an edit: keep :q working.
             vim.bo[buf].modified = false
