@@ -226,8 +226,9 @@ opens at job start and shows stdout and stderr as they arrive. This also
 applies to picker/walk actions when you choose **Open full output**.
 Notify-only mode stays quiet until completion. Pressing `q` closes the float
 without cancelling the process. Output is a normal scratch buffer, not a
-terminal: long lines wrap on screen but stay whole, so yanking compiled SQL
-copies each line in full.
+terminal: ANSI color codes are stripped (dbt forces color even when piped), so
+long lines wrap on screen but stay whole, and yanking compiled SQL copies each
+line in full.
 
 Style the float with `float_border` (`none`, `single`, `double`, `rounded`,
 `solid`, `shadow`), `float_width`, and `float_height`. Dimensions in (0, 1]
